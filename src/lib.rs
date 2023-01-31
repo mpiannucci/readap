@@ -1,46 +1,21 @@
-use nom::{bytes::complete::tag, IResult};
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum DataType {
-    Int32,
-    Float32,
-}
-
-#[derive(Clone, Debug)]
-pub struct VectorValue {
-    data_type: DataType,
-    name: String,
-    len: u32,
-}
-
-#[derive(Clone, Debug)]
-enum Value {
-    Vector(VectorValue),
-    NotImplemented,
-}
-
-#[derive(Clone, Debug)]
-pub struct Dataset {
-    values: Vec<Value>,
-}
-
-impl Dataset {
-    pub fn parse_from(data: &str) -> IResult<&str, Dataset> {
-        let (input, _) = tag("Dataset {")(data)?;
-        Ok((input, Dataset { values: vec![] }))
-    }
-}
+pub mod dds;
 
 #[cfg(test)]
 mod tests {
     use byteorder::{BigEndian, ReadBytesExt};
     use std::{fs, io::Cursor};
 
+    use crate::dds::DdsDataset;
+
     #[test]
     fn read_dods_map() {
         let data = &fs::read("./data/simple_grid/44097w9999.nc.dods").unwrap();
         let dods_string = String::from_utf8_lossy(data);
         let position = dods_string.find("Data:\n").unwrap();
+
+        let (_, dataset) = DdsDataset::parse(&dods_string).unwrap();
+        assert_eq!(dataset.name, "data/swden/44097/44097w9999.nc");
+        assert_eq!(dataset.values.len(), 1);
 
         let mut reader = Cursor::new(&data[position + 6..]);
 
