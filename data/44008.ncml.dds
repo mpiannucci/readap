@@ -1,0 +1,109 @@
+Dataset {
+    Float32 latitude[latitude = 1];
+    Float32 longitude[longitude = 1];
+    Int32 time[time = 461468];
+    Grid {
+     ARRAY:
+        Int32 wind_dir[time = 461468][latitude = 1][longitude = 1];
+     MAPS:
+        Int32 time[time = 461468];
+        Float32 latitude[latitude = 1];
+        Float32 longitude[longitude = 1];
+    } wind_dir;
+    Grid {
+     ARRAY:
+        Float32 wind_spd[time = 461468][latitude = 1][longitude = 1];
+     MAPS:
+        Int32 time[time = 461468];
+        Float32 latitude[latitude = 1];
+        Float32 longitude[longitude = 1];
+    } wind_spd;
+    Grid {
+     ARRAY:
+        Float32 gust[time = 461468][latitude = 1][longitude = 1];
+     MAPS:
+        Int32 time[time = 461468];
+        Float32 latitude[latitude = 1];
+        Float32 longitude[longitude = 1];
+    } gust;
+    Grid {
+     ARRAY:
+        Float32 wave_height[time = 461468][latitude = 1][longitude = 1];
+     MAPS:
+        Int32 time[time = 461468];
+        Float32 latitude[latitude = 1];
+        Float32 longitude[longitude = 1];
+    } wave_height;
+    Grid {
+     ARRAY:
+        Float32 dominant_wpd[time = 461468][latitude = 1][longitude = 1];
+     MAPS:
+        Int32 time[time = 461468];
+        Float32 latitude[latitude = 1];
+        Float32 longitude[longitude = 1];
+    } dominant_wpd;
+    Grid {
+     ARRAY:
+        Float32 average_wpd[time = 461468][latitude = 1][longitude = 1];
+     MAPS:
+        Int32 time[time = 461468];
+        Float32 latitude[latitude = 1];
+        Float32 longitude[longitude = 1];
+    } average_wpd;
+    Grid {
+     ARRAY:
+        Int32 mean_wave_dir[time = 461468][latitude = 1][longitude = 1];
+     MAPS:
+        Int32 time[time = 461468];
+        Float32 latitude[latitude = 1];
+        Float32 longitude[longitude = 1];
+    } mean_wave_dir;
+    Grid {
+     ARRAY:
+        Float32 air_pressure[time = 461468][latitude = 1][longitude = 1];
+     MAPS:
+        Int32 time[time = 461468];
+        Float32 latitude[latitude = 1];
+        Float32 longitude[longitude = 1];
+    } air_pressure;
+    Grid {
+     ARRAY:
+        Float32 air_temperature[time = 461468][latitude = 1][longitude = 1];
+     MAPS:
+        Int32 time[time = 461468];
+        Float32 latitude[latitude = 1];
+        Float32 longitude[longitude = 1];
+    } air_temperature;
+    Grid {
+     ARRAY:
+        Float32 sea_surface_temperature[time = 461468][latitude = 1][longitude = 1];
+     MAPS:
+        Int32 time[time = 461468];
+        Float32 latitude[latitude = 1];
+        Float32 longitude[longitude = 1];
+    } sea_surface_temperature;
+    Grid {
+     ARRAY:
+        Float32 dewpt_temperature[time = 461468][latitude = 1][longitude = 1];
+     MAPS:
+        Int32 time[time = 461468];
+        Float32 latitude[latitude = 1];
+        Float32 longitude[longitude = 1];
+    } dewpt_temperature;
+    Grid {
+     ARRAY:
+        Float32 visibility[time = 461468][latitude = 1][longitude = 1];
+     MAPS:
+        Int32 time[time = 461468];
+        Float32 latitude[latitude = 1];
+        Float32 longitude[longitude = 1];
+    } visibility;
+    Grid {
+     ARRAY:
+        Float32 water_level[time = 461468][latitude = 1][longitude = 1];
+     MAPS:
+        Int32 time[time = 461468];
+        Float32 latitude[latitude = 1];
+        Float32 longitude[longitude = 1];
+    } water_level;
+} data/stdmet/44008/44008.ncml;
