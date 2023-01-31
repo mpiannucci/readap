@@ -7,24 +7,7 @@ use nom::{
     IResult,
 };
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum DataType {
-    Int32,
-    Float32,
-}
-
-impl DataType {
-    pub fn parse(input: &str) -> IResult<&str, Self> {
-        let (input, dtype) = alt((tag("Int32"), tag("Float32")))(input)?;
-        let dtype = match dtype {
-            "Int32" => Self::Int32,
-            "Float32" => Self::Float32,
-            _ => unreachable!(),
-        };
-
-        Ok((input, dtype))
-    }
-}
+use crate::data_type::DataType;
 
 #[derive(Clone, Debug)]
 pub struct DdsArray {

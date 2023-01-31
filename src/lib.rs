@@ -1,3 +1,5 @@
+pub mod data_type;
+pub mod das;
 pub mod dds;
 
 #[cfg(test)]
