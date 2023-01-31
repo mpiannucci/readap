@@ -1,3 +1,36 @@
+use nom::{bytes::complete::tag, IResult};
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum DataType {
+    Int32,
+    Float32,
+}
+
+#[derive(Clone, Debug)]
+pub struct VectorValue {
+    data_type: DataType,
+    name: String,
+    len: u32,
+}
+
+#[derive(Clone, Debug)]
+enum Value {
+    Vector(VectorValue),
+    NotImplemented,
+}
+
+#[derive(Clone, Debug)]
+pub struct Dataset {
+    values: Vec<Value>,
+}
+
+impl Dataset {
+    pub fn parse_from(data: &str) -> IResult<&str, Dataset> {
+        let (input, _) = tag("Dataset {")(data)?;
+        Ok((input, Dataset { values: vec![] }))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use byteorder::{BigEndian, ReadBytesExt};
@@ -34,7 +67,9 @@ mod tests {
             .map(|_| reader.read_i32::<BigEndian>().unwrap())
             .collect::<Vec<i32>>();
 
-        let time_truth = vec![1511902800, 1511906400, 1511910000, 1511913600, 1511917200, 1511920800, 1511924400];
+        let time_truth = vec![
+            1511902800, 1511906400, 1511910000, 1511913600, 1511917200, 1511920800, 1511924400,
+        ];
         for i in 0..time.len() {
             assert_eq!(time[i], time_truth[i]);
         }
