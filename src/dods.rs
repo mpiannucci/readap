@@ -48,7 +48,9 @@ impl DodsDataset {
 
         let (_, data) = match &self.dds.values[index] {
             DdsValue::Array(a) => DataArray::parse(&self.data_bytes[offset..], a.data_type.clone()),
-            DdsValue::Grid(g) => DataArray::parse(&self.data_bytes[offset..], g.array.data_type.clone()),
+            DdsValue::Grid(g) => {
+                DataArray::parse(&self.data_bytes[offset..], g.array.data_type.clone())
+            }
         }
         .map_err(|_| Error::ParseError)?;
 
@@ -72,8 +74,23 @@ impl DodsDataset {
         }?;
 
         match &self.dds.values[index] {
-            DdsValue::Array(a) => a.unpack_data(&self.data_bytes[position..]).map(|c| vec![c]),
-            DdsValue::Grid(g) => g.unpack_coords_data(&self.data_bytes[position..]),
+            DdsValue::Array(a) => {
+                DataArray::parse(&self.data_bytes[position..], a.data_type.clone())
+                    .map_err(|_| Error::ParseError)
+                    .map(|(_, a)| vec![a])
+            }
+            DdsValue::Grid(g) => g
+                .coords
+                .iter()
+                .scan(g.coords_offset(), |acc, c| {
+                    let data =
+                        DataArray::parse(&self.data_bytes[position + *acc..], c.data_type.clone())
+                            .map_err(|_| Error::ParseError)
+                            .map(|(_, a)| a);
+                    *acc = *acc + c.byte_count();
+                    Some(data)
+                })
+                .collect(),
         }
     }
 }
