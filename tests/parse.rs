@@ -6,7 +6,7 @@ use readap::{data_type::DataArray, parse_das_attributes, DdsDataset, DodsDataset
 fn read_das() {
     let input = &fs::read_to_string("./data/swden/44097w9999.nc.das").unwrap();
 
-    let (_, attrs) = parse_das_attributes(input).unwrap();
+    let attrs = parse_das_attributes(input).unwrap();
 
     assert_eq!(attrs.len(), 11);
     assert!(attrs.contains_key("time"));

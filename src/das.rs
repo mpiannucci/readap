@@ -8,7 +8,7 @@ use nom::{
     IResult,
 };
 
-use crate::data_type::{DataType, DataValue};
+use crate::{data_type::{DataType, DataValue}, errors::Error};
 
 #[derive(Clone, Debug)]
 pub struct DasAttribute {
@@ -69,7 +69,7 @@ pub fn parse_das_variable(input: &str) -> IResult<&str, (String, DasVariable)> {
 
 pub type DasAttributes = HashMap<String, DasVariable>;
 
-pub fn parse_das_attributes(input: &str) -> IResult<&str, DasAttributes> {
+fn parse_das_attributes_inner(input: &str) -> IResult<&str, DasAttributes> {
     let (input, _) = tag("Attributes {")(input)?;
     let (input, _) = newline(input)?;
 
@@ -82,6 +82,13 @@ pub fn parse_das_attributes(input: &str) -> IResult<&str, DasAttributes> {
     });
 
     Ok((input, attributes))
+}
+
+pub fn parse_das_attributes(input: &str) -> Result<DasAttributes, Error> {
+    match parse_das_attributes_inner(input) {
+        Ok((_, a)) => Ok(a),
+        Err(_) => Err(Error::ParseError),
+    }
 }
 
 #[cfg(test)]
@@ -174,7 +181,7 @@ mod tests {
         String units "Hz";
     }
 }"#;
-        let (_, attrs) = parse_das_attributes(input).unwrap();
+        let attrs = parse_das_attributes(input).unwrap();
 
         assert_eq!(attrs.len(), 2);
         assert!(attrs.contains_key("time"));
