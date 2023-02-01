@@ -46,7 +46,7 @@ impl DdsArray {
     }
 
     pub fn unpack_data(&self, bytes: &[u8]) -> Result<DataArray, Error> {
-        let (_, data) = DataArray::parse(&bytes, &self.data_type).map_err(|_| Error::ParseError)?;
+        let (_, data) = DataArray::parse(&bytes, self.data_type.clone()).map_err(|_| Error::ParseError)?;
         Ok(data)
     }
 }

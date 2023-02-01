@@ -46,10 +46,10 @@ impl DodsDataset {
             None => Err(Error::ParseError),
         }?;
 
-        let (_, data) = DataArray::parse(
-            &self.data_bytes[offset..],
-            &self.dds.values[index].array_data_type(),
-        )
+        let (_, data) = match &self.dds.values[index] {
+            DdsValue::Array(a) => DataArray::parse(&self.data_bytes[offset..], a.data_type.clone()),
+            DdsValue::Grid(g) => DataArray::parse(&self.data_bytes[offset..], g.array.data_type.clone()),
+        }
         .map_err(|_| Error::ParseError)?;
 
         Ok(data)

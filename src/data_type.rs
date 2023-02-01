@@ -49,7 +49,7 @@ pub enum DataArray {
 }
 
 impl DataArray {
-    pub fn parse<'a>(input: &'a [u8], data_type: &'a DataType) -> IResult<&'a [u8], Self> {
+    pub fn parse<'a>(input: &'a [u8], data_type: DataType) -> IResult<&'a [u8], Self> {
         let (input, length) = be_u32(input)?;
         let (input, length_2) = be_u32(input)?;
 
