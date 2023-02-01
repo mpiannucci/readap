@@ -1,4 +1,10 @@
-use nom::{branch::alt, bytes::complete::tag, IResult, number::complete::{be_u32, be_i32, be_f32}, multi::{count}};
+use nom::{
+    branch::alt,
+    bytes::complete::tag,
+    multi::count,
+    number::complete::{be_f32, be_i32, be_u32},
+    IResult,
+};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum DataType {
@@ -38,34 +44,29 @@ pub enum DataValue {
 
 #[derive(Clone, Debug)]
 pub enum DataArray {
-	Int32(Vec<i32>), 
-	Float32(Vec<f32>),
+    Int32(Vec<i32>),
+    Float32(Vec<f32>),
 }
 
 impl DataArray {
-	pub fn parse<'a>(input: &'a [u8], data_type: &'a DataType) -> IResult<&'a [u8], Self> {
-		let (input, length) = be_u32(input)?;
-		let (input, length_2) = be_u32(input)?;
+    pub fn parse<'a>(input: &'a [u8], data_type: &'a DataType) -> IResult<&'a [u8], Self> {
+        let (input, length) = be_u32(input)?;
+        let (input, length_2) = be_u32(input)?;
 
-		assert!(length == length_2);
+        assert!(length == length_2);
 
-		match data_type {
-    		DataType::Int32 => {
-    			let (input, values) = count(be_i32, length as usize)(input)?;
-    			Ok((input, Self::Int32(values)))
-    		},
-    		DataType::Float32 => {
-    			let (input, values) = count(be_f32, length as usize)(input)?;
-    			Ok((input, Self::Float32(values)))
-    		},
-    		DataType::String => unreachable!(),
-		}
-	}
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum DataArrayError {
-	ParseError,
+        match data_type {
+            DataType::Int32 => {
+                let (input, values) = count(be_i32, length as usize)(input)?;
+                Ok((input, Self::Int32(values)))
+            }
+            DataType::Float32 => {
+                let (input, values) = count(be_f32, length as usize)(input)?;
+                Ok((input, Self::Float32(values)))
+            }
+            DataType::String => unreachable!(),
+        }
+    }
 }
 
 #[cfg(test)]

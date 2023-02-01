@@ -8,7 +8,10 @@ use nom::{
     IResult,
 };
 
-use crate::{data_type::{DataType, DataValue}, errors::Error};
+use crate::{
+    data_type::{DataType, DataValue},
+    errors::Error,
+};
 
 #[derive(Clone, Debug)]
 pub struct DasAttribute {
@@ -148,21 +151,17 @@ mod tests {
         assert_eq!(attrs.len(), 5);
         assert_eq!(attrs["long_name"].data_type, DataType::String);
         assert_eq!(attrs["long_name"].name, "long_name");
-        assert!(
-            if let DataValue::String(s) = &attrs["long_name"].value {
-                s == "Spectral Wave Density"
-            } else {
-                false
-            }
-        );
+        assert!(if let DataValue::String(s) = &attrs["long_name"].value {
+            s == "Spectral Wave Density"
+        } else {
+            false
+        });
 
-        assert!(
-            if let DataValue::Float32(f) = &attrs["_FillValue"].value {
-                (f - 999.0).abs() < 0.0001
-            } else {
-                false
-            }
-        );
+        assert!(if let DataValue::Float32(f) = &attrs["_FillValue"].value {
+            (f - 999.0).abs() < 0.0001
+        } else {
+            false
+        });
     }
 
     #[test]

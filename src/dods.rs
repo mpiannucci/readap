@@ -1,14 +1,4 @@
-use crate::{
-    data_type::{DataArray, DataArrayError},
-    dds::{DdsDataset}, DdsValue,
-};
-
-#[derive(Clone, Debug)]
-pub enum DodsDatasetError {
-    DdsParseFailure,
-    InvalidData,
-    DataUnpackingError,
-}
+use crate::{data_type::DataArray, dds::DdsDataset, errors::Error, DdsValue};
 
 #[derive(Clone, Debug)]
 pub struct DodsDataset {
@@ -17,14 +7,13 @@ pub struct DodsDataset {
 }
 
 impl DodsDataset {
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, DodsDatasetError> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
         let dods_string = String::from_utf8_lossy(&bytes);
-        let (_, dds) =
-            DdsDataset::parse(&dods_string).map_err(|_| DodsDatasetError::DdsParseFailure)?;
+        let (_, dds) = DdsDataset::parse(&dods_string).map_err(|_| Error::ParseError)?;
 
         let binary_data_start = match dods_string.find("Data:\n") {
             Some(p) => Ok(p),
-            None => Err(DodsDatasetError::InvalidData),
+            None => Err(Error::InvalidData),
         }? + 6;
 
         let data_bytes = bytes[binary_data_start..].to_vec();
@@ -46,22 +35,22 @@ impl DodsDataset {
         Some(offset)
     }
 
-    pub fn variable_data(&self, key: &str) -> Result<DataArray, DodsDatasetError> {
+    pub fn variable_data(&self, key: &str) -> Result<DataArray, Error> {
         let index = match self.variable_index(key) {
             Some(o) => Ok(o),
-            None => Err(DodsDatasetError::DataUnpackingError),
+            None => Err(Error::ParseError),
         }?;
 
         let offset = match self.variable_byte_offset(key) {
             Some(o) => Ok(o),
-            None => Err(DodsDatasetError::DataUnpackingError),
+            None => Err(Error::ParseError),
         }?;
 
         let (_, data) = DataArray::parse(
             &self.data_bytes[offset..],
             &self.dds.values[index].array_data_type(),
         )
-        .map_err(|_| DodsDatasetError::DataUnpackingError)?;
+        .map_err(|_| Error::ParseError)?;
 
         Ok(data)
     }
@@ -71,15 +60,15 @@ impl DodsDataset {
         Some(self.dds.values[index].coords())
     }
 
-    pub fn variable_coord_data(&self, key: &str) -> Result<Vec<DataArray>, DataArrayError> {
+    pub fn variable_coord_data(&self, key: &str) -> Result<Vec<DataArray>, Error> {
         let position = match self.variable_byte_offset(key) {
             Some(p) => Ok(p),
-            None => Err(DataArrayError::ParseError),
+            None => Err(Error::ParseError),
         }?;
 
         let index = match self.variable_index(key) {
             Some(i) => Ok(i),
-            None => Err(DataArrayError::ParseError),
+            None => Err(Error::ParseError),
         }?;
 
         match &self.dds.values[index] {

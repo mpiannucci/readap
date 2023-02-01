@@ -7,7 +7,10 @@ use nom::{
     IResult,
 };
 
-use crate::data_type::{DataArray, DataArrayError, DataType};
+use crate::{
+    data_type::{DataArray, DataType},
+    errors::Error,
+};
 
 #[derive(Clone, Debug)]
 pub struct DdsArray {
@@ -42,9 +45,8 @@ impl DdsArray {
         8 + self.array_length() as usize * self.data_type.byte_count()
     }
 
-    pub fn unpack_data(&self, bytes: &[u8]) -> Result<DataArray, DataArrayError> {
-        let (_, data) =
-            DataArray::parse(&bytes, &self.data_type).map_err(|_| DataArrayError::ParseError)?;
+    pub fn unpack_data(&self, bytes: &[u8]) -> Result<DataArray, Error> {
+        let (_, data) = DataArray::parse(&bytes, &self.data_type).map_err(|_| Error::ParseError)?;
         Ok(data)
     }
 }
@@ -114,46 +116,43 @@ impl DdsGrid {
     }
 
     pub fn coords_offset(&self) -> usize {
-    	self.array.byte_count()
+        self.array.byte_count()
     }
 
     pub fn coord_offsets(&self) -> Vec<usize> {
-    	self.coords
-    		.iter()
-    		.scan(self.coords_offset(), |acc, c| {
-    			let prev = *acc;
-    			*acc = *acc + c.byte_count();
-    			Some(prev)
-    		})
-    		.collect()
+        self.coords
+            .iter()
+            .scan(self.coords_offset(), |acc, c| {
+                let prev = *acc;
+                *acc = *acc + c.byte_count();
+                Some(prev)
+            })
+            .collect()
     }
 
-    pub fn unpack_array_data(&self, bytes: &[u8]) -> Result<DataArray, DataArrayError> {
-    	self.array.unpack_data(bytes)
+    pub fn unpack_array_data(&self, bytes: &[u8]) -> Result<DataArray, Error> {
+        self.array.unpack_data(bytes)
     }
 
-    pub fn unpack_coords_data(&self, bytes: &[u8]) -> Result<Vec<DataArray>, DataArrayError> {
-    	self.coords
-    		.iter()
-    		.scan(self.coords_offset(), |acc, c| {
-    			let data = c.unpack_data(&bytes[*acc..]);
-    			*acc = *acc + c.byte_count();
-    			Some(data)
-    		})
-    		.collect()
+    pub fn unpack_coords_data(&self, bytes: &[u8]) -> Result<Vec<DataArray>, Error> {
+        self.coords
+            .iter()
+            .scan(self.coords_offset(), |acc, c| {
+                let data = c.unpack_data(&bytes[*acc..]);
+                *acc = *acc + c.byte_count();
+                Some(data)
+            })
+            .collect()
     }
 
-    pub fn unpack_coord(&self, bytes: &[u8], key: &str) -> Result<DataArray, DataArrayError> {
-    	let index = match self.coords
-    		.iter()
-    		.position(|c| c.name == key) {
-        	Some(i) => Ok(i),
-        	None => Err(DataArrayError::ParseError)
-    	}?;
-    	
+    pub fn unpack_coord(&self, bytes: &[u8], key: &str) -> Result<DataArray, Error> {
+        let index = match self.coords.iter().position(|c| c.name == key) {
+            Some(i) => Ok(i),
+            None => Err(Error::ParseError),
+        }?;
 
-    	let offset = self.coord_offsets()[index];
-    	self.coords[index].unpack_data(&bytes[offset..])
+        let offset = self.coord_offsets()[index];
+        self.coords[index].unpack_data(&bytes[offset..])
     }
 }
 
@@ -200,7 +199,7 @@ impl DdsValue {
     }
 
     pub fn coords(&self) -> Vec<String> {
-    	match self {
+        match self {
             DdsValue::Array(a) => a.coords.iter().map(|c| c.0.clone()).collect(),
             DdsValue::Grid(g) => g.coords.iter().map(|c| c.name.clone()).collect(),
         }
