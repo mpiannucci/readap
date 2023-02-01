@@ -1,6 +1,7 @@
-pub mod data_type;
 pub mod das;
+pub mod data_type;
 pub mod dds;
+pub mod dods;
 
 #[cfg(test)]
 mod tests {

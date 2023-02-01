@@ -7,7 +7,7 @@ use nom::{
     IResult,
 };
 
-use crate::data_type::DataType;
+use crate::data_type::{DataArray, DataArrayError, DataType};
 
 #[derive(Clone, Debug)]
 pub struct DdsArray {
@@ -36,6 +36,16 @@ impl DdsArray {
 
     pub fn array_length(&self) -> u32 {
         self.coords.iter().fold(1, |acc, c| acc * c.1)
+    }
+
+    pub fn byte_count(&self) -> usize {
+        8 + self.array_length() as usize * self.data_type.byte_count()
+    }
+
+    pub fn unpack_data(&self, bytes: &[u8]) -> Result<DataArray, DataArrayError> {
+        let (_, data) =
+            DataArray::parse(&bytes, &self.data_type).map_err(|_| DataArrayError::ParseError)?;
+        Ok(data)
     }
 }
 
@@ -95,6 +105,55 @@ impl DdsGrid {
             },
         ))
     }
+
+    pub fn byte_count(&self) -> usize {
+        let array_size = self.array.byte_count();
+        self.coords
+            .iter()
+            .fold(array_size, |acc, c| acc + c.byte_count())
+    }
+
+    pub fn coords_offset(&self) -> usize {
+    	self.array.byte_count()
+    }
+
+    pub fn coord_offsets(&self) -> Vec<usize> {
+    	self.coords
+    		.iter()
+    		.scan(self.coords_offset(), |acc, c| {
+    			let prev = *acc;
+    			*acc = *acc + c.byte_count();
+    			Some(prev)
+    		})
+    		.collect()
+    }
+
+    pub fn unpack_array_data(&self, bytes: &[u8]) -> Result<DataArray, DataArrayError> {
+    	self.array.unpack_data(bytes)
+    }
+
+    pub fn unpack_coords_data(&self, bytes: &[u8]) -> Result<Vec<DataArray>, DataArrayError> {
+    	self.coords
+    		.iter()
+    		.scan(self.coords_offset(), |acc, c| {
+    			let data = c.unpack_data(&bytes[*acc..]);
+    			*acc = *acc + c.byte_count();
+    			Some(data)
+    		})
+    		.collect()
+    }
+
+    pub fn unpack_coord(&self, bytes: &[u8], key: &str) -> Result<DataArray, DataArrayError> {
+    	let index = match self.coords
+    		.iter()
+    		.position(|c| c.name == key) {
+        	Some(i) => Ok(i),
+        	None => Err(DataArrayError::ParseError)
+    	}?;
+
+    	let offset = self.coord_offsets()[index];
+    	self.coords[index].unpack_data(&bytes[offset..])
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -116,6 +175,34 @@ impl DdsValue {
     fn parse_grid(input: &str) -> IResult<&str, DdsValue> {
         let (input, grid) = terminated(DdsGrid::parse, newline)(input)?;
         Ok((input, DdsValue::Grid(grid)))
+    }
+
+    pub fn name(&self) -> String {
+        match self {
+            Self::Array(a) => a.name.clone(),
+            Self::Grid(g) => g.name.clone(),
+        }
+    }
+
+    pub fn byte_count(&self) -> usize {
+        match self {
+            DdsValue::Array(a) => a.byte_count(),
+            DdsValue::Grid(g) => g.byte_count(),
+        }
+    }
+
+    pub fn array_data_type(&self) -> DataType {
+        match self {
+            DdsValue::Array(a) => a.data_type.clone(),
+            DdsValue::Grid(g) => g.array.data_type.clone(),
+        }
+    }
+
+    pub fn coords(&self) -> Vec<String> {
+    	match self {
+            DdsValue::Array(a) => a.coords.iter().map(|c| c.0.clone()).collect(),
+            DdsValue::Grid(g) => g.coords.iter().map(|c| c.name.clone()).collect(),
+        }
     }
 }
 
