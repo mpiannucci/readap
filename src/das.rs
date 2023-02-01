@@ -8,20 +8,13 @@ use nom::{
     IResult,
 };
 
-use crate::data_type::DataType;
-
-#[derive(Clone, Debug)]
-pub enum DasAttributeValue {
-    Int32(i32),
-    Float32(f32),
-    String(String),
-}
+use crate::data_type::{DataType, DataValue};
 
 #[derive(Clone, Debug)]
 pub struct DasAttribute {
     pub data_type: DataType,
     pub name: String,
-    pub value: DasAttributeValue,
+    pub value: DataValue,
 }
 
 impl DasAttribute {
@@ -38,9 +31,9 @@ impl DasAttribute {
         let (input, _) = tag(";")(input)?;
 
         let value = match data_type {
-            DataType::Int32 => DasAttributeValue::Int32(raw_value.parse::<i32>().unwrap()),
-            DataType::Float32 => DasAttributeValue::Float32(raw_value.parse::<f32>().unwrap()),
-            DataType::String => DasAttributeValue::String(raw_value.replace("\"", "")),
+            DataType::Int32 => DataValue::Int32(raw_value.parse::<i32>().unwrap()),
+            DataType::Float32 => DataValue::Float32(raw_value.parse::<f32>().unwrap()),
+            DataType::String => DataValue::String(raw_value.replace("\"", "")),
         };
 
         Ok((
@@ -93,7 +86,7 @@ pub fn parse_das_attributes(input: &str) -> IResult<&str, DasAttributes> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{das::DasAttributeValue, data_type::DataType};
+    use crate::{das::DataValue, data_type::DataType};
 
     use super::{parse_das_attributes, parse_das_variable, DasAttribute};
 
@@ -103,7 +96,7 @@ mod tests {
         let (_, string_value) = DasAttribute::parse(input).unwrap();
         assert_eq!(string_value.data_type, DataType::String);
         assert_eq!(string_value.name, "long_name");
-        let value = if let DasAttributeValue::String(s) = string_value.value {
+        let value = if let DataValue::String(s) = string_value.value {
             s
         } else {
             "".to_string()
@@ -114,7 +107,7 @@ mod tests {
         let (_, int_value) = DasAttribute::parse(input).unwrap();
         assert_eq!(int_value.data_type, DataType::Int32);
         assert_eq!(int_value.name, "_FillValue");
-        let value = if let DasAttributeValue::Int32(i) = int_value.value {
+        let value = if let DataValue::Int32(i) = int_value.value {
             i
         } else {
             0
@@ -125,7 +118,7 @@ mod tests {
         let (_, float_value) = DasAttribute::parse(input).unwrap();
         assert_eq!(float_value.data_type, DataType::Float32);
         assert_eq!(float_value.name, "_FillValue");
-        let value = if let DasAttributeValue::Float32(f) = float_value.value {
+        let value = if let DataValue::Float32(f) = float_value.value {
             f
         } else {
             0.0
@@ -149,7 +142,7 @@ mod tests {
         assert_eq!(attrs["long_name"].data_type, DataType::String);
         assert_eq!(attrs["long_name"].name, "long_name");
         assert!(
-            if let DasAttributeValue::String(s) = &attrs["long_name"].value {
+            if let DataValue::String(s) = &attrs["long_name"].value {
                 s == "Spectral Wave Density"
             } else {
                 false
@@ -157,7 +150,7 @@ mod tests {
         );
 
         assert!(
-            if let DasAttributeValue::Float32(f) = &attrs["_FillValue"].value {
+            if let DataValue::Float32(f) = &attrs["_FillValue"].value {
                 (f - 999.0).abs() < 0.0001
             } else {
                 false

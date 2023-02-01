@@ -30,6 +30,13 @@ impl DataType {
 }
 
 #[derive(Clone, Debug)]
+pub enum DataValue {
+    Int32(i32),
+    Float32(f32),
+    String(String),
+}
+
+#[derive(Clone, Debug)]
 pub enum DataArray {
 	Int32(Vec<i32>), 
 	Float32(Vec<f32>),
