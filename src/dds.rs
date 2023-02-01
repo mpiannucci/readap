@@ -150,6 +150,7 @@ impl DdsGrid {
         	Some(i) => Ok(i),
         	None => Err(DataArrayError::ParseError)
     	}?;
+    	
 
     	let offset = self.coord_offsets()[index];
     	self.coords[index].unpack_data(&bytes[offset..])

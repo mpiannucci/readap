@@ -1,6 +1,6 @@
 use crate::{
     data_type::{DataArray, DataArrayError},
-    dds::{DdsDataset},
+    dds::{DdsDataset}, DdsValue,
 };
 
 #[derive(Clone, Debug)]
@@ -81,8 +81,6 @@ impl DodsDataset {
             Some(i) => Ok(i),
             None => Err(DataArrayError::ParseError),
         }?;
-
-        .map_err(|_| DodsDatasetError::DataUnpackingError)?;
 
         match &self.dds.values[index] {
             DdsValue::Array(a) => a.unpack_data(&self.data_bytes[position..]).map(|c| vec![c]),
