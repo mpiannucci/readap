@@ -1,3 +1,3 @@
 # readap
 
-Read OpenDAP binary data with rust
+Read OpenDAP binary data with pure rust
