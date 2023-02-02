@@ -6,6 +6,8 @@ use nom::{
     IResult,
 };
 
+use crate::errors::Error;
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum DataType {
     Int32,
@@ -65,6 +67,28 @@ impl DataArray {
                 Ok((input, Self::Float32(values)))
             }
             DataType::String => unreachable!(),
+        }
+    }
+}
+
+impl TryInto<Vec<i32>> for DataArray {
+    type Error = Error;
+
+    fn try_into(self) -> Result<Vec<i32>, Self::Error> {
+        match self {
+            DataArray::Int32(v) => Ok(v),
+            DataArray::Float32(_) => Err(Error::InvalidTypecast),
+        }
+    }
+}
+
+impl TryInto<Vec<f32>> for DataArray {
+    type Error = Error;
+
+    fn try_into(self) -> Result<Vec<f32>, Self::Error> {
+        match self {
+            DataArray::Int32(_) => Err(Error::InvalidTypecast),
+            DataArray::Float32(v) => Ok(v),
         }
     }
 }
