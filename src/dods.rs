@@ -1,4 +1,4 @@
-use crate::{data_type::DataArray, dds::DdsDataset, errors::Error, DdsValue};
+use crate::{data::DataArray, dds::DdsDataset, errors::Error, DdsValue};
 
 #[derive(Clone, Debug)]
 pub struct DodsDataset {

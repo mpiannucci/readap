@@ -1,5 +1,5 @@
 pub mod das;
-pub mod data_type;
+pub mod data;
 pub mod dds;
 pub mod dods;
 pub mod errors;

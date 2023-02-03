@@ -7,7 +7,7 @@ use nom::{
     IResult,
 };
 
-use crate::{data_type::DataType, errors::Error};
+use crate::{data::DataType, errors::Error};
 
 #[derive(Clone, Debug)]
 pub struct DdsArray {

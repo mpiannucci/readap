@@ -9,7 +9,7 @@ use nom::{
 };
 
 use crate::{
-    data_type::{DataType, DataValue},
+    data::{DataType, DataValue},
     errors::Error,
 };
 
@@ -120,7 +120,7 @@ pub fn parse_das_attributes(input: &str) -> Result<DasAttributes, Error> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{das::DataValue, data_type::DataType};
+    use crate::{das::DataValue, data::DataType};
 
     use super::{parse_das_attributes, parse_das_variable, DasAttribute};
 

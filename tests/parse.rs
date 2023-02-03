@@ -1,6 +1,6 @@
 use std::fs;
 
-use readap::{data_type::DataArray, parse_das_attributes, DdsDataset, DodsDataset};
+use readap::{data::DataArray, parse_das_attributes, DdsDataset, DodsDataset};
 
 #[test]
 fn read_das() {
