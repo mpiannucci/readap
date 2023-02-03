@@ -57,12 +57,7 @@ impl DodsDataset {
         Ok(data)
     }
 
-    pub fn variable_coords(&self, key: &str) -> Option<Vec<String>> {
-        let index = self.variable_index(key)?;
-        Some(self.dds.values[index].coords())
-    }
-
-    pub fn variable_coord_data(&self, key: &str) -> Result<Vec<DataArray>, Error> {
+    pub fn variable_coords(&self, key: &str) -> Result<Vec<(String, DataArray)>, Error> {
         let position = match self.variable_byte_offset(key) {
             Some(p) => Ok(p),
             None => Err(Error::ParseError),
@@ -75,18 +70,20 @@ impl DodsDataset {
 
         match &self.dds.values[index] {
             DdsValue::Array(a) => {
+                let name = a.name.clone();
                 DataArray::parse(&self.data_bytes[position..], a.data_type.clone())
                     .map_err(|_| Error::ParseError)
-                    .map(|(_, a)| vec![a])
+                    .map(|(_, a)| vec![(name, a)])
             }
             DdsValue::Grid(g) => g
                 .coords
                 .iter()
                 .scan(g.coords_offset(), |acc, c| {
+                    let name = c.name.clone();
                     let data =
                         DataArray::parse(&self.data_bytes[position + *acc..], c.data_type.clone())
                             .map_err(|_| Error::ParseError)
-                            .map(|(_, a)| a);
+                            .map(|(_, a)| (name, a));
                     *acc = *acc + c.byte_count();
                     Some(data)
                 })

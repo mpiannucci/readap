@@ -38,11 +38,10 @@ fn read_dataset() {
     assert_eq!(mwd[mwd.len() - 1], 188);
 
     let coords = dataset.variable_coords("mean_wave_dir").unwrap();
-    assert_eq!(coords[0], "time");
-    assert_eq!(coords[1], "frequency");
-    assert_eq!(coords[2], "latitude");
-    assert_eq!(coords[3], "longitude");
+    assert_eq!(coords[0].0, "time");
+    assert_eq!(coords[1].0, "frequency");
+    assert_eq!(coords[2].0, "latitude");
+    assert_eq!(coords[3].0, "longitude");
 
-    let coords = dataset.variable_coord_data("mean_wave_dir").unwrap();
-    assert_eq!( TryInto::<Vec<i32>>::try_into(coords[0].clone()).unwrap()[2], 1511910000);
+    assert_eq!( TryInto::<Vec<i32>>::try_into(coords[0].1.clone()).unwrap()[2], 1511910000);
 }
