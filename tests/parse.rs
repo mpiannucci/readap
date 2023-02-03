@@ -12,13 +12,16 @@ fn read_das() {
     assert!(attrs.contains_key("time"));
     assert!(attrs.contains_key("wave_spectrum_r1"));
     assert!(attrs.contains_key("NC_GLOBAL"));
+
+    let units: String = attrs["time"]["units"].clone().try_into().unwrap();
+    assert_eq!(units, "seconds since 1970-01-01 00:00:00 UTC");
 }
 
 #[test]
 fn read_dds() {
     let input = &fs::read_to_string("./data/44008.ncml.dds").unwrap();
 
-    let (_, dataset) = DdsDataset::parse(input).unwrap();
+    let dataset = DdsDataset::from_bytes(&input).unwrap();
     assert_eq!(dataset.values.len(), 16);
     assert_eq!(dataset.name, "data/stdmet/44008/44008.ncml");
 }

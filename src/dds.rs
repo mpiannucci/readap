@@ -7,7 +7,7 @@ use nom::{
     IResult,
 };
 
-use crate::data_type::DataType;
+use crate::{data_type::DataType, errors::Error};
 
 #[derive(Clone, Debug)]
 pub struct DdsArray {
@@ -180,6 +180,13 @@ pub struct DdsDataset {
 }
 
 impl DdsDataset {
+    pub fn from_bytes(input: &str) -> Result<Self, Error> {
+        match Self::parse(input) {
+            Ok((_, d)) => Ok(d),
+            Err(_) => Err(Error::ParseError),
+        }
+    }
+
     pub fn parse(input: &str) -> IResult<&str, Self> {
         let (input, _) = tag("Dataset {")(input)?;
         let (input, _) = newline(input)?;

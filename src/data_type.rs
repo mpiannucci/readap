@@ -44,6 +44,42 @@ pub enum DataValue {
     String(String),
 }
 
+impl TryInto<String> for DataValue {
+    type Error = Error;
+
+    fn try_into(self) -> Result<String, Self::Error> {
+        if let DataValue::String(s) = &self {
+            Ok(s.clone())
+        } else {
+            Err(Error::InvalidTypecast)
+        }
+    }
+}
+
+impl TryInto<i32> for DataValue {
+    type Error = Error;
+
+    fn try_into(self) -> Result<i32, Self::Error> {
+        if let DataValue::Int32(i) = &self {
+            Ok(*i)
+        } else {
+            Err(Error::InvalidTypecast)
+        }
+    }
+}
+
+impl TryInto<f32> for DataValue {
+    type Error = Error;
+
+    fn try_into(self) -> Result<f32, Self::Error> {
+        if let DataValue::Float32(f) = &self {
+            Ok(*f)
+        } else {
+            Err(Error::InvalidTypecast)
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub enum DataArray {
     Int32(Vec<i32>),

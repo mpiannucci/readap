@@ -50,6 +50,30 @@ impl DasAttribute {
     }
 }
 
+impl TryInto<String> for DasAttribute {
+    type Error = Error;
+
+    fn try_into(self) -> Result<String, Self::Error> {
+        self.value.try_into()
+    }
+}
+
+impl TryInto<i32> for DasAttribute {
+    type Error = Error;
+
+    fn try_into(self) -> Result<i32, Self::Error> {
+        self.value.try_into()
+    }
+}
+
+impl TryInto<f32> for DasAttribute {
+    type Error = Error;
+
+    fn try_into(self) -> Result<f32, Self::Error> {
+        self.value.try_into()
+    }
+}
+
 pub type DasVariable = HashMap<String, DasAttribute>;
 
 pub fn parse_das_variable(input: &str) -> IResult<&str, (String, DasVariable)> {
