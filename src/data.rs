@@ -80,6 +80,60 @@ impl TryInto<f32> for DataValue {
     }
 }
 
+pub struct DataValueIterator<'a> {
+    input: &'a [u8],
+    data_type: DataType,
+    count: usize,
+}
+
+impl<'a> DataValueIterator<'a> {
+    pub fn new(data: &'a [u8], data_type: DataType) -> Result<Self, Error> {
+        let (input, count) =
+            be_u32(data).map_err(|_: nom::Err<nom::error::Error<_>>| Error::ParseError)?;
+        let (input, count_2) =
+            be_u32(input).map_err(|_: nom::Err<nom::error::Error<_>>| Error::ParseError)?;
+
+        assert!(count == count_2);
+
+        Ok(Self {
+            input,
+            data_type,
+            count: count as usize,
+        })
+    }
+
+    pub fn len(&self) -> usize {
+        self.count
+    }
+}
+
+impl<'a> Iterator for DataValueIterator<'a> {
+    type Item = DataValue;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.input.len() < self.data_type.byte_count() {
+            return None;
+        }
+
+        let (input, value) = match &self.data_type {
+            DataType::Int32 => {
+                be_i32(self.input)
+                    .map_err(|_: nom::Err<nom::error::Error<_>>| Error::ParseError)
+                    .map_or(None, |(input, i)| Some((input, DataValue::Int32(i))))
+            }
+            DataType::Float32 => {
+                be_f32(self.input)
+                    .map_err(|_: nom::Err<nom::error::Error<_>>| Error::ParseError)
+                    .map_or(None, |(input, f)| Some((input, DataValue::Float32(f))))
+            }
+            DataType::String => unreachable!(),
+        }?;
+
+        self.input = input;
+        Some(value)
+    }
+}
+
 #[derive(Clone, Debug)]
 pub enum DataArray {
     Int32(Vec<i32>),

@@ -1,4 +1,9 @@
-use crate::{data::DataArray, dds::DdsDataset, errors::Error, DdsValue};
+use crate::{
+    data::{DataArray, DataValueIterator},
+    dds::DdsDataset,
+    errors::Error,
+    DdsValue,
+};
 
 #[derive(Clone, Debug)]
 pub struct DodsDataset {
@@ -33,6 +38,29 @@ impl DodsDataset {
         let position = self.variable_index(key)?;
         let offset = (0usize..position).fold(0, |acc, i| acc + self.dds.values[i].byte_count());
         Some(offset)
+    }
+
+    pub fn variable_data_iter(&self, key: &str) -> Result<DataValueIterator, Error> {
+        let index = match self.variable_index(key) {
+            Some(o) => Ok(o),
+            None => Err(Error::ParseError),
+        }?;
+
+        let offset = match self.variable_byte_offset(key) {
+            Some(o) => Ok(o),
+            None => Err(Error::ParseError),
+        }?;
+
+        match &self.dds.values[index] {
+            DdsValue::Array(a) => DataValueIterator::new(
+                &self.data_bytes[offset..offset + a.array_length() as usize],
+                a.data_type.clone(),
+            ),
+            DdsValue::Grid(g) => DataValueIterator::new(
+                &self.data_bytes[offset..offset + g.array.array_length() as usize],
+                g.array.data_type.clone(),
+            ),
+        }
     }
 
     pub fn variable_data(&self, key: &str) -> Result<DataArray, Error> {
