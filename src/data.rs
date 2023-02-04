@@ -60,10 +60,22 @@ impl TryInto<i32> for DataValue {
     type Error = Error;
 
     fn try_into(self) -> Result<i32, Self::Error> {
-        if let DataValue::Int32(i) = &self {
-            Ok(*i)
-        } else {
-            Err(Error::InvalidTypecast)
+        match &self {
+            DataValue::Int32(i) => Ok(*i),
+            DataValue::Float32(f) => Ok(*f as i32),
+            DataValue::String(_) => Err(Error::InvalidTypecast),
+        }
+    }
+}
+
+impl TryInto<i64> for DataValue {
+    type Error = Error;
+
+    fn try_into(self) -> Result<i64, Self::Error> {
+        match &self {
+            DataValue::Int32(i) => Ok(*i as i64),
+            DataValue::Float32(f) => Ok(*f as i64),
+            DataValue::String(_) => Err(Error::InvalidTypecast),
         }
     }
 }
@@ -72,13 +84,26 @@ impl TryInto<f32> for DataValue {
     type Error = Error;
 
     fn try_into(self) -> Result<f32, Self::Error> {
-        if let DataValue::Float32(f) = &self {
-            Ok(*f)
-        } else {
-            Err(Error::InvalidTypecast)
+        match &self {
+            DataValue::Int32(i) => Ok(*i as f32),
+            DataValue::Float32(f) => Ok(*f),
+            DataValue::String(_) => Err(Error::InvalidTypecast),
         }
     }
 }
+
+impl TryInto<f64> for DataValue {
+    type Error = Error;
+
+    fn try_into(self) -> Result<f64, Self::Error> {
+        match &self {
+            DataValue::Int32(i) => Ok(*i as f64),
+            DataValue::Float32(f) => Ok(*f as f64),
+            DataValue::String(_) => Err(Error::InvalidTypecast),
+        }
+    }
+}
+
 
 pub struct DataValueIterator<'a> {
     input: &'a [u8],
@@ -167,7 +192,18 @@ impl TryInto<Vec<i32>> for DataArray {
     fn try_into(self) -> Result<Vec<i32>, Self::Error> {
         match self {
             DataArray::Int32(v) => Ok(v),
-            DataArray::Float32(_) => Err(Error::InvalidTypecast),
+            DataArray::Float32(v) => Ok(v.into_iter().map(|i| i as i32).collect()),
+        }
+    }
+}
+
+impl TryInto<Vec<i64>> for DataArray {
+    type Error = Error;
+
+    fn try_into(self) -> Result<Vec<i64>, Self::Error> {
+        match self {
+            DataArray::Int32(v) => Ok(v.into_iter().map(|i| i as i64).collect()),
+            DataArray::Float32(v) => Ok(v.into_iter().map(|i| i as i64).collect()),
         }
     }
 }
@@ -177,8 +213,19 @@ impl TryInto<Vec<f32>> for DataArray {
 
     fn try_into(self) -> Result<Vec<f32>, Self::Error> {
         match self {
-            DataArray::Int32(_) => Err(Error::InvalidTypecast),
+            DataArray::Int32(v) => Ok(v.into_iter().map(|i| i as f32).collect()),
             DataArray::Float32(v) => Ok(v),
+        }
+    }
+}
+
+impl TryInto<Vec<f64>> for DataArray {
+    type Error = Error;
+
+    fn try_into(self) -> Result<Vec<f64>, Self::Error> {
+        match self {
+            DataArray::Int32(v) => Ok(v.into_iter().map(|i| i as f64).collect()),
+            DataArray::Float32(v) => Ok(v.into_iter().map(|i| i as f64).collect()),
         }
     }
 }
