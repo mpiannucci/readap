@@ -6,13 +6,13 @@ use crate::{
 };
 
 #[derive(Clone, Debug)]
-pub struct DodsDataset {
+pub struct DodsDataset<'a> {
     pub dds: DdsDataset,
-    pub data_bytes: Vec<u8>,
+    pub data_bytes: &'a[u8],
 }
 
-impl DodsDataset {
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+impl <'a> DodsDataset<'a> {
+    pub fn from_bytes(bytes: &'a [u8]) -> Result<Self, Error> {
         let dods_string = String::from_utf8_lossy(&bytes);
         let (_, dds) = DdsDataset::parse(&dods_string).map_err(|_| Error::ParseError)?;
 
@@ -21,7 +21,7 @@ impl DodsDataset {
             None => Err(Error::InvalidData),
         }? + 6;
 
-        let data_bytes = bytes[binary_data_start..].to_vec();
+        let data_bytes = &bytes[binary_data_start..];
 
         Ok(DodsDataset { dds, data_bytes })
     }
