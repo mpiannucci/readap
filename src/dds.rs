@@ -171,6 +171,20 @@ impl DdsValue {
             DdsValue::Grid(g) => g.coords.iter().map(|c| c.name.clone()).collect(),
         }
     }
+
+    pub fn array(&self) -> Result<&DdsArray, Error> {
+        match &self {
+            DdsValue::Array(a) => Ok(a),
+            DdsValue::Grid(_) => Err(Error::InvalidTypecast),
+        }
+    }
+
+    pub fn grid(&self) -> Result<&DdsGrid, Error> {
+        match &self {
+            DdsValue::Array(_) => Err(Error::InvalidTypecast),
+            DdsValue::Grid(g) => Ok(g),
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
