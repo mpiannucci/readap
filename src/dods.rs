@@ -53,11 +53,11 @@ impl <'a> DodsDataset<'a> {
 
         match &self.dds.values[index] {
             DdsValue::Array(a) => DataValueIterator::new(
-                &self.data_bytes[offset..offset + a.array_length() as usize],
+                &self.data_bytes[offset..offset + a.byte_count() as usize ],
                 a.data_type.clone(),
             ),
             DdsValue::Grid(g) => DataValueIterator::new(
-                &self.data_bytes[offset..offset + g.array.array_length() as usize],
+                &self.data_bytes[offset..offset + g.array.byte_count() as usize],
                 g.array.data_type.clone(),
             ),
         }

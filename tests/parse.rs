@@ -58,7 +58,7 @@ fn read_dataset() {
     let mwd_iter = dataset.variable_data_iter("mean_wave_dir").unwrap();
     let pwd_iter = dataset.variable_data_iter("principal_wave_dir").unwrap();
 
-    let (mwd, pwd) = mwd_iter
+    let (mwd_fi, pwd_fi) = mwd_iter
         .zip(pwd_iter)
         .skip(5)
         .map(|(mwd_value, pwd_value)| {
@@ -69,6 +69,12 @@ fn read_dataset() {
         .next()
         .unwrap();
 
-    assert_eq!(mwd, 160);
-    assert_eq!(pwd, 168);
+    assert_eq!(mwd_fi, 160);
+    assert_eq!(pwd_fi, 168);
+
+    let mwd_unpacked = dataset.variable_data_iter("mean_wave_dir").unwrap()
+        .map(|i| i.try_into().unwrap())
+        .collect::<Vec<f64>>();
+
+    assert_eq!(mwd_unpacked.len(), mwd.len());
 }
