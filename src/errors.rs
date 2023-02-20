@@ -1,22 +1,13 @@
-use std::fmt::Display;
+use thiserror::Error;
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum Error {
+    #[error("Invalid Data")]
 	InvalidData,
+    #[error("Parse Error")]
 	ParseError,
+    #[error("Invalid Typecast")]
 	InvalidTypecast,
+    #[error("Not Implemented")]
 	NotImplemented,
-}
-
-impl Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let message = match &self {
-            Error::InvalidData => "InvalidData",
-            Error::ParseError => "ParseError",
-            Error::InvalidTypecast => "InvalidTypecast",
-            Error::NotImplemented => "NotImplemented",
-        };
-
-        f.write_str(message)
-    }
 }
