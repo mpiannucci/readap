@@ -34,13 +34,41 @@ impl DasAttribute {
         let (input, _) = tag(";")(input)?;
 
         let value = match data_type {
-            DataType::Byte => DataValue::Byte(raw_value.parse::<i8>().unwrap()),
-            DataType::Int16 => DataValue::Int16(raw_value.parse::<i16>().unwrap()),
-            DataType::UInt16 => DataValue::UInt16(raw_value.parse::<u16>().unwrap()),
-            DataType::Int32 => DataValue::Int32(raw_value.parse::<i32>().unwrap()),
-            DataType::UInt32 => DataValue::UInt32(raw_value.parse::<u32>().unwrap()),
-            DataType::Float32 => DataValue::Float32(raw_value.parse::<f32>().unwrap()),
-            DataType::Float64 => DataValue::Float64(raw_value.parse::<f64>().unwrap()),
+            DataType::Byte => {
+                let parsed = raw_value.parse::<i8>()
+                    .map_err(|_| nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Digit)))?;
+                DataValue::Byte(parsed)
+            }
+            DataType::Int16 => {
+                let parsed = raw_value.parse::<i16>()
+                    .map_err(|_| nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Digit)))?;
+                DataValue::Int16(parsed)
+            }
+            DataType::UInt16 => {
+                let parsed = raw_value.parse::<u16>()
+                    .map_err(|_| nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Digit)))?;
+                DataValue::UInt16(parsed)
+            }
+            DataType::Int32 => {
+                let parsed = raw_value.parse::<i32>()
+                    .map_err(|_| nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Digit)))?;
+                DataValue::Int32(parsed)
+            }
+            DataType::UInt32 => {
+                let parsed = raw_value.parse::<u32>()
+                    .map_err(|_| nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Digit)))?;
+                DataValue::UInt32(parsed)
+            }
+            DataType::Float32 => {
+                let parsed = raw_value.parse::<f32>()
+                    .map_err(|_| nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Float)))?;
+                DataValue::Float32(parsed)
+            }
+            DataType::Float64 => {
+                let parsed = raw_value.parse::<f64>()
+                    .map_err(|_| nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Float)))?;
+                DataValue::Float64(parsed)
+            }
             DataType::String => DataValue::String(raw_value.replace("\"", "")),
             DataType::URL => DataValue::URL(raw_value.replace("\"", "")),
         };
@@ -131,9 +159,9 @@ mod tests {
     use super::{parse_das_attributes, parse_das_variable, DasAttribute};
 
     #[test]
-    fn parse_attribute() {
+    fn parse_attribute() -> Result<(), Box<dyn std::error::Error>> {
         let input = r#"String long_name "Longitude";"#;
-        let (_, string_value) = DasAttribute::parse(input).unwrap();
+        let (_, string_value) = DasAttribute::parse(input)?;
         assert_eq!(string_value.data_type, DataType::String);
         assert_eq!(string_value.name, "long_name");
         let value = if let DataValue::String(s) = string_value.value {
@@ -144,7 +172,7 @@ mod tests {
         assert_eq!(value, "Longitude");
 
         let input = "Int32 _FillValue 999;";
-        let (_, int_value) = DasAttribute::parse(input).unwrap();
+        let (_, int_value) = DasAttribute::parse(input)?;
         assert_eq!(int_value.data_type, DataType::Int32);
         assert_eq!(int_value.name, "_FillValue");
         let value = if let DataValue::Int32(i) = int_value.value {
@@ -155,7 +183,7 @@ mod tests {
         assert_eq!(value, 999);
 
         let input = "Float32 _FillValue 999.0;";
-        let (_, float_value) = DasAttribute::parse(input).unwrap();
+        let (_, float_value) = DasAttribute::parse(input)?;
         assert_eq!(float_value.data_type, DataType::Float32);
         assert_eq!(float_value.name, "_FillValue");
         let value = if let DataValue::Float32(f) = float_value.value {
@@ -164,10 +192,11 @@ mod tests {
             0.0
         };
         assert!((value - 999.0).abs() < 0.0001);
+        Ok(())
     }
 
     #[test]
-    fn parse_variable() {
+    fn parse_variable() -> Result<(), Box<dyn std::error::Error>> {
         let input = r#"    spectral_wave_density {
         String long_name "Spectral Wave Density";
         String short_name "swden";
@@ -176,7 +205,7 @@ mod tests {
         Float32 _FillValue 999.0;
     }"#;
 
-        let (_, (name, attrs)) = parse_das_variable(input).unwrap();
+        let (_, (name, attrs)) = parse_das_variable(input)?;
         assert_eq!(name, "spectral_wave_density");
         assert_eq!(attrs.len(), 5);
         assert_eq!(attrs["long_name"].data_type, DataType::String);
@@ -192,10 +221,11 @@ mod tests {
         } else {
             false
         });
+        Ok(())
     }
 
     #[test]
-    fn parse_das() {
+    fn parse_das() -> Result<(), Box<dyn std::error::Error>> {
         let input = r#"Attributes {
     time {
         String long_name "Epoch Time";
@@ -210,10 +240,29 @@ mod tests {
         String units "Hz";
     }
 }"#;
-        let attrs = parse_das_attributes(input).unwrap();
+        let attrs = parse_das_attributes(input)?;
 
         assert_eq!(attrs.len(), 2);
         assert!(attrs.contains_key("time"));
         assert!(attrs.contains_key("frequency"));
+        Ok(())
+    }
+
+    #[test]
+    fn parse_invalid_attribute_values() {
+        // Test invalid integer
+        let input = "Int32 _FillValue not_a_number;";
+        let result = DasAttribute::parse(input);
+        assert!(result.is_err());
+
+        // Test invalid float
+        let input = "Float32 _FillValue invalid_float;";
+        let result = DasAttribute::parse(input);
+        assert!(result.is_err());
+
+        // Test invalid byte
+        let input = "Byte quality_flag 999;"; // Out of range for i8
+        let result = DasAttribute::parse(input);
+        assert!(result.is_err());
     }
 }
