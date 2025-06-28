@@ -116,7 +116,7 @@ impl DdsGrid {
             .iter()
             .scan(self.coords_offset(), |acc, c| {
                 let prev = *acc;
-                *acc = *acc + c.byte_count();
+                *acc += c.byte_count();
                 Some(prev)
             })
             .collect()
@@ -130,45 +130,48 @@ pub struct DdsStructure {
 }
 
 fn parse_simple_field(input: &str) -> IResult<&str, DdsValue> {
-    preceded(multispace0, alt((
-        // Try structure first
-        |input| {
-            let (input, structure) = DdsStructure::parse(input)?;
-            let (input, _) = newline(input)?;
-            Ok((input, DdsValue::Structure(structure)))
-        },
-        // Try sequence second
-        |input| {
-            let (input, sequence) = DdsSequence::parse(input)?;
-            let (input, _) = newline(input)?;
-            Ok((input, DdsValue::Sequence(sequence)))
-        },
-        // Try array with dimensions
-        |input| {
-            match DdsArray::parse(input) {
-                Ok((remaining, array)) => {
-                    let (remaining, _) = newline(remaining)?;
-                    Ok((remaining, DdsValue::Array(array)))
+    preceded(
+        multispace0,
+        alt((
+            // Try structure first
+            |input| {
+                let (input, structure) = DdsStructure::parse(input)?;
+                let (input, _) = newline(input)?;
+                Ok((input, DdsValue::Structure(structure)))
+            },
+            // Try sequence second
+            |input| {
+                let (input, sequence) = DdsSequence::parse(input)?;
+                let (input, _) = newline(input)?;
+                Ok((input, DdsValue::Sequence(sequence)))
+            },
+            // Try array with dimensions
+            |input| {
+                match DdsArray::parse(input) {
+                    Ok((remaining, array)) => {
+                        let (remaining, _) = newline(remaining)?;
+                        Ok((remaining, DdsValue::Array(array)))
+                    }
+                    Err(_) => {
+                        // Parse simple field like "Int32 id;" as a single-element array
+                        let (input, data_type) = DataType::parse(input)?;
+                        let (input, _) = multispace0(input)?;
+                        let (input, name) = take_until(";")(input)?;
+                        let (input, _) = tag(";")(input)?;
+                        let (input, _) = newline(input)?;
+                        let name = name.trim().to_string();
+
+                        let array = DdsArray {
+                            data_type,
+                            name,
+                            coords: vec![], // Simple scalar field
+                        };
+                        Ok((input, DdsValue::Array(array)))
+                    }
                 }
-                Err(_) => {
-                    // Parse simple field like "Int32 id;" as a single-element array
-                    let (input, data_type) = DataType::parse(input)?;
-                    let (input, _) = multispace0(input)?;
-                    let (input, name) = take_until(";")(input)?;
-                    let (input, _) = tag(";")(input)?;
-                    let (input, _) = newline(input)?;
-                    let name = name.trim().to_string();
-                    
-                    let array = DdsArray {
-                        data_type,
-                        name,
-                        coords: vec![], // Simple scalar field
-                    };
-                    Ok((input, DdsValue::Array(array)))
-                }
-            }
-        },
-    )))(input)
+            },
+        )),
+    )(input)
 }
 
 impl DdsStructure {
@@ -176,7 +179,8 @@ impl DdsStructure {
         let (input, _) = tag("Structure {")(input)?;
         let (input, _) = newline(input)?;
 
-        let (input, (fields, _)) = many_till(parse_simple_field, preceded(multispace0, tag("}")))(input)?;
+        let (input, (fields, _)) =
+            many_till(parse_simple_field, preceded(multispace0, tag("}")))(input)?;
         let (input, _) = multispace0(input)?;
         let (input, name) = take_until(";")(input)?;
         let (input, _) = tag(";")(input)?;
@@ -186,7 +190,9 @@ impl DdsStructure {
     }
 
     pub fn byte_count(&self) -> usize {
-        self.fields.iter().fold(0, |acc, field| acc + field.byte_count())
+        self.fields
+            .iter()
+            .fold(0, |acc, field| acc + field.byte_count())
     }
 }
 
@@ -201,7 +207,8 @@ impl DdsSequence {
         let (input, _) = tag("Sequence {")(input)?;
         let (input, _) = newline(input)?;
 
-        let (input, (fields, _)) = many_till(parse_simple_field, preceded(multispace0, tag("}")))(input)?;
+        let (input, (fields, _)) =
+            many_till(parse_simple_field, preceded(multispace0, tag("}")))(input)?;
         let (input, _) = multispace0(input)?;
         let (input, name) = take_until(";")(input)?;
         let (input, _) = tag(";")(input)?;
@@ -213,7 +220,10 @@ impl DdsSequence {
     pub fn byte_count(&self) -> usize {
         // Sequences have variable length, so we return a base size
         // In practice, this would need to be calculated based on actual data
-        8 + self.fields.iter().fold(0, |acc, field| acc + field.byte_count())
+        8 + self
+            .fields
+            .iter()
+            .fold(0, |acc, field| acc + field.byte_count())
     }
 }
 
@@ -227,7 +237,15 @@ pub enum DdsValue {
 
 impl DdsValue {
     pub fn parse(input: &str) -> IResult<&str, Self> {
-        preceded(multispace0, alt((Self::parse_structure, Self::parse_sequence, Self::parse_grid, Self::parse_array)))(input)
+        preceded(
+            multispace0,
+            alt((
+                Self::parse_structure,
+                Self::parse_sequence,
+                Self::parse_grid,
+                Self::parse_array,
+            )),
+        )(input)
     }
 
     fn parse_array(input: &str) -> IResult<&str, DdsValue> {
@@ -282,7 +300,7 @@ impl DdsValue {
             DdsValue::Array(a) => a.coords.iter().map(|c| c.0.clone()).collect(),
             DdsValue::Grid(g) => g.coords.iter().map(|c| c.name.clone()).collect(),
             DdsValue::Structure(_) => vec![], // Structures don't have coordinates
-            DdsValue::Sequence(_) => vec![], // Sequences don't have coordinates
+            DdsValue::Sequence(_) => vec![],  // Sequences don't have coordinates
         }
     }
 

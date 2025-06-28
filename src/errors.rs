@@ -3,11 +3,11 @@ use thiserror::Error;
 #[derive(Debug, Error)]
 pub enum Error {
     #[error("Invalid Data")]
-	InvalidData,
+    InvalidData,
     #[error("Parse Error")]
-	ParseError,
+    ParseError,
     #[error("Invalid Typecast")]
-	InvalidTypecast,
+    InvalidTypecast,
     #[error("Not Implemented")]
-	NotImplemented,
+    NotImplemented,
 }

@@ -1,4 +1,4 @@
-use readap::{data::*, das::*, dds::*};
+use readap::{das::*, data::*, dds::*};
 
 #[cfg(test)]
 mod data_type_tests {
@@ -49,26 +49,43 @@ mod data_type_tests {
         // Test Int16 conversions
         let int16_val = DataValue::Int16(-1000);
         assert_eq!(TryInto::<i32>::try_into(int16_val.clone()).unwrap(), -1000);
-        assert_eq!(TryInto::<f32>::try_into(int16_val.clone()).unwrap(), -1000.0);
+        assert_eq!(
+            TryInto::<f32>::try_into(int16_val.clone()).unwrap(),
+            -1000.0
+        );
         assert_eq!(TryInto::<f64>::try_into(int16_val).unwrap(), -1000.0);
 
         // Test UInt16 conversions
         let uint16_val = DataValue::UInt16(65000);
         assert_eq!(TryInto::<i32>::try_into(uint16_val.clone()).unwrap(), 65000);
-        assert_eq!(TryInto::<f32>::try_into(uint16_val.clone()).unwrap(), 65000.0);
+        assert_eq!(
+            TryInto::<f32>::try_into(uint16_val.clone()).unwrap(),
+            65000.0
+        );
         assert_eq!(TryInto::<f64>::try_into(uint16_val).unwrap(), 65000.0);
 
         // Test UInt32 conversions
         let uint32_val = DataValue::UInt32(4000000000);
-        assert_eq!(TryInto::<i32>::try_into(uint32_val.clone()).unwrap(), -294967296); // Overflow
-        assert_eq!(TryInto::<f32>::try_into(uint32_val.clone()).unwrap(), 4000000000.0);
+        assert_eq!(
+            TryInto::<i32>::try_into(uint32_val.clone()).unwrap(),
+            -294967296
+        ); // Overflow
+        assert_eq!(
+            TryInto::<f32>::try_into(uint32_val.clone()).unwrap(),
+            4000000000.0
+        );
         assert_eq!(TryInto::<f64>::try_into(uint32_val).unwrap(), 4000000000.0);
 
         // Test Float64 conversions
         let float64_val = DataValue::Float64(3.14159265359);
         assert_eq!(TryInto::<i32>::try_into(float64_val.clone()).unwrap(), 3);
-        assert!((TryInto::<f32>::try_into(float64_val.clone()).unwrap() - 3.1415927).abs() < 0.0001);
-        assert_eq!(TryInto::<f64>::try_into(float64_val).unwrap(), 3.14159265359);
+        assert!(
+            (TryInto::<f32>::try_into(float64_val.clone()).unwrap() - 3.1415927).abs() < 0.0001
+        );
+        assert_eq!(
+            TryInto::<f64>::try_into(float64_val).unwrap(),
+            3.14159265359
+        );
 
         // Test String conversions
         let string_val = DataValue::String("test".to_string());
@@ -76,7 +93,10 @@ mod data_type_tests {
 
         // Test URL conversions
         let url_val = DataValue::URL("http://example.com".to_string());
-        assert_eq!(TryInto::<String>::try_into(url_val).unwrap(), "http://example.com");
+        assert_eq!(
+            TryInto::<String>::try_into(url_val).unwrap(),
+            "http://example.com"
+        );
     }
 
     #[test]
@@ -267,9 +287,19 @@ mod dds_array_tests {
     #[test]
     fn test_multidimensional_arrays() {
         let test_cases = vec![
-            ("Byte data[x = 10][y = 20][z = 5];", DataType::Byte, 1000, 8 + 1000),
+            (
+                "Byte data[x = 10][y = 20][z = 5];",
+                DataType::Byte,
+                1000,
+                8 + 1000,
+            ),
             ("Int16 data[x = 5][y = 5];", DataType::Int16, 25, 8 + 50),
-            ("UInt16 data[x = 3][y = 3][z = 3];", DataType::UInt16, 27, 8 + 54),
+            (
+                "UInt16 data[x = 3][y = 3][z = 3];",
+                DataType::UInt16,
+                27,
+                8 + 54,
+            ),
             ("UInt32 data[x = 2][y = 2];", DataType::UInt32, 4, 8 + 16),
             ("Float64 data[x = 10];", DataType::Float64, 10, 8 + 80),
         ];
@@ -361,15 +391,21 @@ mod integration_tests {
 
         let attrs = parse_das_attributes(input).unwrap();
         assert_eq!(attrs.len(), 2);
-        
+
         // Check sensor_metadata
         let sensor_meta = &attrs["sensor_metadata"];
         assert_eq!(sensor_meta.len(), 7);
         assert_eq!(sensor_meta["quality_level"].data_type, DataType::Byte);
         assert_eq!(sensor_meta["min_elevation"].data_type, DataType::Int16);
         assert_eq!(sensor_meta["max_elevation"].data_type, DataType::UInt16);
-        assert_eq!(sensor_meta["total_measurements"].data_type, DataType::UInt32);
-        assert_eq!(sensor_meta["calibration_factor"].data_type, DataType::Float64);
+        assert_eq!(
+            sensor_meta["total_measurements"].data_type,
+            DataType::UInt32
+        );
+        assert_eq!(
+            sensor_meta["calibration_factor"].data_type,
+            DataType::Float64
+        );
         assert_eq!(sensor_meta["documentation"].data_type, DataType::URL);
         assert_eq!(sensor_meta["instrument_name"].data_type, DataType::String);
 
@@ -377,8 +413,14 @@ mod integration_tests {
         let measurement_data = &attrs["measurement_data"];
         assert_eq!(measurement_data.len(), 3);
         assert_eq!(measurement_data["_FillValue"].data_type, DataType::Float32);
-        assert_eq!(measurement_data["valid_range_min"].data_type, DataType::Int32);
-        assert_eq!(measurement_data["valid_range_max"].data_type, DataType::Int32);
+        assert_eq!(
+            measurement_data["valid_range_min"].data_type,
+            DataType::Int32
+        );
+        assert_eq!(
+            measurement_data["valid_range_max"].data_type,
+            DataType::Int32
+        );
     }
 
     #[test]

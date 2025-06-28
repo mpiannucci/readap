@@ -24,15 +24,15 @@ pub enum DataType {
 impl DataType {
     pub fn parse(input: &str) -> IResult<&str, Self> {
         let (input, dtype) = alt((
-            tag("Byte"), 
-            tag("Int16"), 
-            tag("UInt16"), 
-            tag("Int32"), 
-            tag("UInt32"), 
-            tag("Float32"), 
-            tag("Float64"), 
-            tag("String"), 
-            tag("URL")
+            tag("Byte"),
+            tag("Int16"),
+            tag("UInt16"),
+            tag("Int32"),
+            tag("UInt32"),
+            tag("Float32"),
+            tag("Float64"),
+            tag("String"),
+            tag("URL"),
         ))(input)?;
         let dtype = match dtype {
             "Byte" => Self::Byte,
@@ -60,7 +60,7 @@ impl DataType {
             DataType::Float32 => 4,
             DataType::Float64 => 8,
             DataType::String => 0, // Variable length
-            DataType::URL => 0, // Variable length
+            DataType::URL => 0,    // Variable length
         }
     }
 }
@@ -158,7 +158,6 @@ impl TryInto<f64> for DataValue {
     }
 }
 
-
 pub struct DataValueIterator<'a> {
     input: &'a [u8],
     data_type: DataType,
@@ -184,6 +183,10 @@ impl<'a> DataValueIterator<'a> {
     pub fn len(&self) -> usize {
         self.count
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.count == 0
+    }
 }
 
 impl<'a> Iterator for DataValueIterator<'a> {
@@ -195,43 +198,29 @@ impl<'a> Iterator for DataValueIterator<'a> {
         }
 
         let (input, value) = match &self.data_type {
-            DataType::Byte => {
-                be_i8(self.input)
-                    .map_err(|_: nom::Err<nom::error::Error<_>>| Error::ParseError)
-                    .map_or(None, |(input, b)| Some((input, DataValue::Byte(b))))
-            }
-            DataType::Int16 => {
-                be_i16(self.input)
-                    .map_err(|_: nom::Err<nom::error::Error<_>>| Error::ParseError)
-                    .map_or(None, |(input, i)| Some((input, DataValue::Int16(i))))
-            }
-            DataType::UInt16 => {
-                be_u16(self.input)
-                    .map_err(|_: nom::Err<nom::error::Error<_>>| Error::ParseError)
-                    .map_or(None, |(input, u)| Some((input, DataValue::UInt16(u))))
-            }
-            DataType::Int32 => {
-                be_i32(self.input)
-                    .map_err(|_: nom::Err<nom::error::Error<_>>| Error::ParseError)
-                    .map_or(None, |(input, i)| Some((input, DataValue::Int32(i))))
-            }
-            DataType::UInt32 => {
-                be_u32(self.input)
-                    .map_err(|_: nom::Err<nom::error::Error<_>>| Error::ParseError)
-                    .map_or(None, |(input, u)| Some((input, DataValue::UInt32(u))))
-            }
-            DataType::Float32 => {
-                be_f32(self.input)
-                    .map_err(|_: nom::Err<nom::error::Error<_>>| Error::ParseError)
-                    .map_or(None, |(input, f)| Some((input, DataValue::Float32(f))))
-            }
-            DataType::Float64 => {
-                be_f64(self.input)
-                    .map_err(|_: nom::Err<nom::error::Error<_>>| Error::ParseError)
-                    .map_or(None, |(input, f)| Some((input, DataValue::Float64(f))))
-            }
+            DataType::Byte => be_i8(self.input)
+                .map_err(|_: nom::Err<nom::error::Error<_>>| Error::ParseError)
+                .map_or(None, |(input, b)| Some((input, DataValue::Byte(b)))),
+            DataType::Int16 => be_i16(self.input)
+                .map_err(|_: nom::Err<nom::error::Error<_>>| Error::ParseError)
+                .map_or(None, |(input, i)| Some((input, DataValue::Int16(i)))),
+            DataType::UInt16 => be_u16(self.input)
+                .map_err(|_: nom::Err<nom::error::Error<_>>| Error::ParseError)
+                .map_or(None, |(input, u)| Some((input, DataValue::UInt16(u)))),
+            DataType::Int32 => be_i32(self.input)
+                .map_err(|_: nom::Err<nom::error::Error<_>>| Error::ParseError)
+                .map_or(None, |(input, i)| Some((input, DataValue::Int32(i)))),
+            DataType::UInt32 => be_u32(self.input)
+                .map_err(|_: nom::Err<nom::error::Error<_>>| Error::ParseError)
+                .map_or(None, |(input, u)| Some((input, DataValue::UInt32(u)))),
+            DataType::Float32 => be_f32(self.input)
+                .map_err(|_: nom::Err<nom::error::Error<_>>| Error::ParseError)
+                .map_or(None, |(input, f)| Some((input, DataValue::Float32(f)))),
+            DataType::Float64 => be_f64(self.input)
+                .map_err(|_: nom::Err<nom::error::Error<_>>| Error::ParseError)
+                .map_or(None, |(input, f)| Some((input, DataValue::Float64(f)))),
             DataType::String => return None, // TODO: Implement string parsing
-            DataType::URL => return None, // TODO: Implement URL parsing
+            DataType::URL => return None,    // TODO: Implement URL parsing
         }?;
 
         self.input = input;
@@ -253,7 +242,7 @@ pub enum DataArray {
 }
 
 impl DataArray {
-    pub fn parse<'a>(input: &'a [u8], data_type: DataType) -> IResult<&'a [u8], Self> {
+    pub fn parse(input: &[u8], data_type: DataType) -> IResult<&[u8], Self> {
         let (input, length) = be_u32(input)?;
         let (input, length_2) = be_u32(input)?;
 
@@ -290,11 +279,17 @@ impl DataArray {
             }
             DataType::String => {
                 // TODO: Implement string array parsing
-                Err(nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Tag)))
+                Err(nom::Err::Error(nom::error::Error::new(
+                    input,
+                    nom::error::ErrorKind::Tag,
+                )))
             }
             DataType::URL => {
                 // TODO: Implement URL array parsing
-                Err(nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Tag)))
+                Err(nom::Err::Error(nom::error::Error::new(
+                    input,
+                    nom::error::ErrorKind::Tag,
+                )))
             }
         }
     }
