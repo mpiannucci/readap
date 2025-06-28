@@ -35,38 +35,45 @@ impl DasAttribute {
 
         let value = match data_type {
             DataType::Byte => {
-                let parsed = raw_value.parse::<i8>()
-                    .map_err(|_| nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Digit)))?;
+                let parsed = raw_value.parse::<i8>().map_err(|_| {
+                    nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Digit))
+                })?;
                 DataValue::Byte(parsed)
             }
             DataType::Int16 => {
-                let parsed = raw_value.parse::<i16>()
-                    .map_err(|_| nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Digit)))?;
+                let parsed = raw_value.parse::<i16>().map_err(|_| {
+                    nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Digit))
+                })?;
                 DataValue::Int16(parsed)
             }
             DataType::UInt16 => {
-                let parsed = raw_value.parse::<u16>()
-                    .map_err(|_| nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Digit)))?;
+                let parsed = raw_value.parse::<u16>().map_err(|_| {
+                    nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Digit))
+                })?;
                 DataValue::UInt16(parsed)
             }
             DataType::Int32 => {
-                let parsed = raw_value.parse::<i32>()
-                    .map_err(|_| nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Digit)))?;
+                let parsed = raw_value.parse::<i32>().map_err(|_| {
+                    nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Digit))
+                })?;
                 DataValue::Int32(parsed)
             }
             DataType::UInt32 => {
-                let parsed = raw_value.parse::<u32>()
-                    .map_err(|_| nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Digit)))?;
+                let parsed = raw_value.parse::<u32>().map_err(|_| {
+                    nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Digit))
+                })?;
                 DataValue::UInt32(parsed)
             }
             DataType::Float32 => {
-                let parsed = raw_value.parse::<f32>()
-                    .map_err(|_| nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Float)))?;
+                let parsed = raw_value.parse::<f32>().map_err(|_| {
+                    nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Float))
+                })?;
                 DataValue::Float32(parsed)
             }
             DataType::Float64 => {
-                let parsed = raw_value.parse::<f64>()
-                    .map_err(|_| nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Float)))?;
+                let parsed = raw_value.parse::<f64>().map_err(|_| {
+                    nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Float))
+                })?;
                 DataValue::Float64(parsed)
             }
             DataType::String => DataValue::String(raw_value.replace("\"", "")),
