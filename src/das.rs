@@ -34,9 +34,15 @@ impl DasAttribute {
         let (input, _) = tag(";")(input)?;
 
         let value = match data_type {
+            DataType::Byte => DataValue::Byte(raw_value.parse::<i8>().unwrap()),
+            DataType::Int16 => DataValue::Int16(raw_value.parse::<i16>().unwrap()),
+            DataType::UInt16 => DataValue::UInt16(raw_value.parse::<u16>().unwrap()),
             DataType::Int32 => DataValue::Int32(raw_value.parse::<i32>().unwrap()),
+            DataType::UInt32 => DataValue::UInt32(raw_value.parse::<u32>().unwrap()),
             DataType::Float32 => DataValue::Float32(raw_value.parse::<f32>().unwrap()),
+            DataType::Float64 => DataValue::Float64(raw_value.parse::<f64>().unwrap()),
             DataType::String => DataValue::String(raw_value.replace("\"", "")),
+            DataType::URL => DataValue::URL(raw_value.replace("\"", "")),
         };
 
         Ok((

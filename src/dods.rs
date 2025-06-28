@@ -60,6 +60,8 @@ impl <'a> DodsDataset<'a> {
                 &self.data_bytes[offset..offset + g.array.byte_count() as usize],
                 g.array.data_type.clone(),
             ),
+            DdsValue::Structure(_) => Err(Error::NotImplemented),
+            DdsValue::Sequence(_) => Err(Error::NotImplemented),
         }
     }
 
@@ -79,6 +81,8 @@ impl <'a> DodsDataset<'a> {
             DdsValue::Grid(g) => {
                 DataArray::parse(&self.data_bytes[offset..], g.array.data_type.clone())
             }
+            DdsValue::Structure(_) => return Err(Error::NotImplemented),
+            DdsValue::Sequence(_) => return Err(Error::NotImplemented),
         }
         .map_err(|_| Error::ParseError)?;
 
@@ -116,6 +120,8 @@ impl <'a> DodsDataset<'a> {
                     Some(data)
                 })
                 .collect(),
+            DdsValue::Structure(_) => Err(Error::NotImplemented),
+            DdsValue::Sequence(_) => Err(Error::NotImplemented),
         }
     }
 }
