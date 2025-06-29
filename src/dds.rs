@@ -364,7 +364,7 @@ impl DdsDataset {
 mod tests {
     use crate::dds::{DataType, DdsValue};
 
-    use super::{coordinate, DdsArray, DdsDataset, DdsGrid, DdsStructure, DdsSequence};
+    use super::{coordinate, DdsArray, DdsDataset, DdsGrid, DdsSequence, DdsStructure};
 
     #[test]
     fn parse_coords() {
