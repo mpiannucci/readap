@@ -401,4 +401,138 @@ mod tests {
         let result = DataValueIterator::new(&dummy_data, DataType::Int32);
         assert!(result.is_ok());
     }
+
+    #[test]
+    fn test_parse_all_data_types() {
+        // Test parsing all supported data types
+        let test_cases = vec![
+            ("Byte", DataType::Byte),
+            ("Int16", DataType::Int16),
+            ("UInt16", DataType::UInt16),
+            ("Int32", DataType::Int32),
+            ("UInt32", DataType::UInt32),
+            ("Float32", DataType::Float32),
+            ("Float64", DataType::Float64),
+            ("String", DataType::String),
+            ("URL", DataType::URL),
+        ];
+
+        for (input, expected) in test_cases {
+            let (_, parsed) = DataType::parse(input).unwrap();
+            assert_eq!(parsed, expected, "Failed to parse {}", input);
+        }
+    }
+
+    #[test]
+    fn test_data_type_byte_counts() {
+        assert_eq!(DataType::Byte.byte_count(), 1);
+        assert_eq!(DataType::Int16.byte_count(), 2);
+        assert_eq!(DataType::UInt16.byte_count(), 2);
+        assert_eq!(DataType::Int32.byte_count(), 4);
+        assert_eq!(DataType::UInt32.byte_count(), 4);
+        assert_eq!(DataType::Float32.byte_count(), 4);
+        assert_eq!(DataType::Float64.byte_count(), 8);
+        assert_eq!(DataType::String.byte_count(), 0); // Variable length
+        assert_eq!(DataType::URL.byte_count(), 0); // Variable length
+    }
+
+    #[test]
+    fn test_data_value_conversions() {
+        // Test Byte conversions
+        let byte_val = DataValue::Byte(42);
+        assert_eq!(TryInto::<i32>::try_into(byte_val.clone()).unwrap(), 42);
+        assert_eq!(TryInto::<f32>::try_into(byte_val.clone()).unwrap(), 42.0);
+        assert_eq!(TryInto::<f64>::try_into(byte_val).unwrap(), 42.0);
+
+        // Test Int16 conversions
+        let int16_val = DataValue::Int16(-1000);
+        assert_eq!(TryInto::<i32>::try_into(int16_val.clone()).unwrap(), -1000);
+        assert_eq!(
+            TryInto::<f32>::try_into(int16_val.clone()).unwrap(),
+            -1000.0
+        );
+        assert_eq!(TryInto::<f64>::try_into(int16_val).unwrap(), -1000.0);
+
+        // Test UInt16 conversions
+        let uint16_val = DataValue::UInt16(65000);
+        assert_eq!(TryInto::<i32>::try_into(uint16_val.clone()).unwrap(), 65000);
+        assert_eq!(
+            TryInto::<f32>::try_into(uint16_val.clone()).unwrap(),
+            65000.0
+        );
+        assert_eq!(TryInto::<f64>::try_into(uint16_val).unwrap(), 65000.0);
+
+        // Test UInt32 conversions
+        let uint32_val = DataValue::UInt32(4000000000);
+        assert_eq!(
+            TryInto::<i32>::try_into(uint32_val.clone()).unwrap(),
+            -294967296
+        ); // Overflow
+        assert_eq!(
+            TryInto::<f32>::try_into(uint32_val.clone()).unwrap(),
+            4000000000.0
+        );
+        assert_eq!(TryInto::<f64>::try_into(uint32_val).unwrap(), 4000000000.0);
+
+        // Test Float64 conversions
+        let float64_val = DataValue::Float64(3.14159265359);
+        assert_eq!(TryInto::<i32>::try_into(float64_val.clone()).unwrap(), 3);
+        assert!(
+            (TryInto::<f32>::try_into(float64_val.clone()).unwrap() - 3.1415927).abs() < 0.0001
+        );
+        assert_eq!(
+            TryInto::<f64>::try_into(float64_val).unwrap(),
+            3.14159265359
+        );
+
+        // Test String conversions
+        let string_val = DataValue::String("test".to_string());
+        assert_eq!(TryInto::<String>::try_into(string_val).unwrap(), "test");
+
+        // Test URL conversions
+        let url_val = DataValue::URL("http://example.com".to_string());
+        assert_eq!(
+            TryInto::<String>::try_into(url_val).unwrap(),
+            "http://example.com"
+        );
+    }
+
+    #[test]
+    fn test_invalid_conversions() {
+        // Test invalid conversions that should return errors
+        let string_val = DataValue::String("not_a_number".to_string());
+        assert!(TryInto::<i32>::try_into(string_val.clone()).is_err());
+        assert!(TryInto::<f32>::try_into(string_val).is_err());
+
+        let url_val = DataValue::URL("http://example.com".to_string());
+        assert!(TryInto::<i32>::try_into(url_val.clone()).is_err());
+        assert!(TryInto::<f32>::try_into(url_val).is_err());
+    }
+
+    #[test]
+    fn test_data_array_conversions() {
+        // Test DataArray to Vec<i32> conversions
+        let int32_array = DataArray::Int32(vec![1, 2, 3, 4, 5]);
+        let converted: Vec<i32> = int32_array.try_into().unwrap();
+        assert_eq!(converted, vec![1, 2, 3, 4, 5]);
+
+        let byte_array = DataArray::Byte(vec![1, 2, 3]);
+        let converted: Vec<i32> = byte_array.try_into().unwrap();
+        assert_eq!(converted, vec![1, 2, 3]);
+
+        // Test DataArray to Vec<f64> conversions
+        let float64_array = DataArray::Float64(vec![1.1, 2.2, 3.3]);
+        let converted: Vec<f64> = float64_array.try_into().unwrap();
+        assert_eq!(converted, vec![1.1, 2.2, 3.3]);
+
+        let float32_array = DataArray::Float32(vec![1.1, 2.2, 3.3]);
+        let converted: Vec<f64> = float32_array.try_into().unwrap();
+        assert!((converted[0] - 1.1).abs() < 0.0001);
+        assert!((converted[1] - 2.2).abs() < 0.0001);
+        assert!((converted[2] - 3.3).abs() < 0.0001);
+
+        // Test invalid conversions
+        let string_array = DataArray::String(vec!["a".to_string(), "b".to_string()]);
+        assert!(TryInto::<Vec<i32>>::try_into(string_array).is_err());
+    }
 }

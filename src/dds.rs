@@ -364,7 +364,7 @@ impl DdsDataset {
 mod tests {
     use crate::dds::{DataType, DdsValue};
 
-    use super::{coordinate, DdsArray, DdsDataset, DdsGrid};
+    use super::{coordinate, DdsArray, DdsDataset, DdsGrid, DdsStructure, DdsSequence};
 
     #[test]
     fn parse_coords() {
@@ -478,5 +478,67 @@ mod tests {
         } else {
             false
         });
+    }
+
+    #[test]
+    fn test_parse_new_data_type_arrays() {
+        // Test Byte array
+        let input = "Byte quality_flags[time = 10];";
+        let (_, array) = DdsArray::parse(input).unwrap();
+        assert_eq!(array.data_type, DataType::Byte);
+        assert_eq!(array.name, "quality_flags");
+        assert_eq!(array.coords.len(), 1);
+        assert_eq!(array.coords[0].0, "time");
+        assert_eq!(array.coords[0].1, 10);
+        assert_eq!(array.array_length(), 10);
+        assert_eq!(array.byte_count(), 8 + 10 * 1); // 8 bytes header + 10 bytes data
+
+        // Test Int16 array
+        let input = "Int16 elevations[latitude = 5][longitude = 5];";
+        let (_, array) = DdsArray::parse(input).unwrap();
+        assert_eq!(array.data_type, DataType::Int16);
+        assert_eq!(array.name, "elevations");
+        assert_eq!(array.coords.len(), 2);
+        assert_eq!(array.array_length(), 25);
+        assert_eq!(array.byte_count(), 8 + 25 * 2); // 8 bytes header + 50 bytes data
+
+        // Test UInt32 array
+        let input = "UInt32 file_sizes[files = 100];";
+        let (_, array) = DdsArray::parse(input).unwrap();
+        assert_eq!(array.data_type, DataType::UInt32);
+        assert_eq!(array.name, "file_sizes");
+        assert_eq!(array.coords.len(), 1);
+        assert_eq!(array.array_length(), 100);
+        assert_eq!(array.byte_count(), 8 + 100 * 4); // 8 bytes header + 400 bytes data
+
+        // Test Float64 array
+        let input = "Float64 precise_measurements[samples = 50];";
+        let (_, array) = DdsArray::parse(input).unwrap();
+        assert_eq!(array.data_type, DataType::Float64);
+        assert_eq!(array.name, "precise_measurements");
+        assert_eq!(array.coords.len(), 1);
+        assert_eq!(array.array_length(), 50);
+        assert_eq!(array.byte_count(), 8 + 50 * 8); // 8 bytes header + 400 bytes data
+    }
+
+    #[test]
+    fn test_parse_structures_and_sequences() {
+        // Test simple structure
+        let input = r#"Structure {
+    Int32 id;
+    Float32 value;
+} measurement;"#;
+        let (_, structure) = DdsStructure::parse(input).unwrap();
+        assert_eq!(structure.name, "measurement");
+        assert_eq!(structure.fields.len(), 2);
+
+        // Test simple sequence
+        let input = r#"Sequence {
+    Int32 timestamp;
+    Float32 temperature;
+} readings;"#;
+        let (_, sequence) = DdsSequence::parse(input).unwrap();
+        assert_eq!(sequence.name, "readings");
+        assert_eq!(sequence.fields.len(), 2);
     }
 }

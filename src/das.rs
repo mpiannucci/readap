@@ -272,4 +272,99 @@ mod tests {
         let result = DasAttribute::parse(input);
         assert!(result.is_err());
     }
+
+    #[test]
+    fn test_parse_new_data_type_attributes() {
+        // Test Byte attribute
+        let input = "Byte quality_flag 1;";
+        let (_, attr) = DasAttribute::parse(input).unwrap();
+        assert_eq!(attr.data_type, DataType::Byte);
+        assert_eq!(attr.name, "quality_flag");
+        if let DataValue::Byte(val) = attr.value {
+            assert_eq!(val, 1);
+        } else {
+            panic!("Expected Byte value");
+        }
+
+        // Test Int16 attribute
+        let input = "Int16 elevation -500;";
+        let (_, attr) = DasAttribute::parse(input).unwrap();
+        assert_eq!(attr.data_type, DataType::Int16);
+        assert_eq!(attr.name, "elevation");
+        if let DataValue::Int16(val) = attr.value {
+            assert_eq!(val, -500);
+        } else {
+            panic!("Expected Int16 value");
+        }
+
+        // Test UInt16 attribute
+        let input = "UInt16 port_number 8080;";
+        let (_, attr) = DasAttribute::parse(input).unwrap();
+        assert_eq!(attr.data_type, DataType::UInt16);
+        assert_eq!(attr.name, "port_number");
+        if let DataValue::UInt16(val) = attr.value {
+            assert_eq!(val, 8080);
+        } else {
+            panic!("Expected UInt16 value");
+        }
+
+        // Test UInt32 attribute
+        let input = "UInt32 file_size 4294967295;";
+        let (_, attr) = DasAttribute::parse(input).unwrap();
+        assert_eq!(attr.data_type, DataType::UInt32);
+        assert_eq!(attr.name, "file_size");
+        if let DataValue::UInt32(val) = attr.value {
+            assert_eq!(val, 4294967295);
+        } else {
+            panic!("Expected UInt32 value");
+        }
+
+        // Test Float64 attribute
+        let input = "Float64 precision_value 3.141592653589793;";
+        let (_, attr) = DasAttribute::parse(input).unwrap();
+        assert_eq!(attr.data_type, DataType::Float64);
+        assert_eq!(attr.name, "precision_value");
+        if let DataValue::Float64(val) = attr.value {
+            assert!((val - 3.141592653589793).abs() < 1e-15);
+        } else {
+            panic!("Expected Float64 value");
+        }
+
+        // Test URL attribute
+        let input = r#"URL data_source "http://example.com/data.nc";"#;
+        let (_, attr) = DasAttribute::parse(input).unwrap();
+        assert_eq!(attr.data_type, DataType::URL);
+        assert_eq!(attr.name, "data_source");
+        if let DataValue::URL(val) = attr.value {
+            assert_eq!(val, "http://example.com/data.nc");
+        } else {
+            panic!("Expected URL value");
+        }
+    }
+
+    #[test]
+    fn test_das_variable_with_new_types() -> Result<(), Error> {
+        let input = r#"    sensor_data {
+        Byte quality_flag 1;
+        Int16 elevation -500;
+        UInt16 port_number 8080;
+        UInt32 file_size 4294967295;
+        Float64 precision_value 3.141592653589793;
+        URL data_source "http://example.com/data.nc";
+    }"#;
+
+        let (_, (name, attrs)) = parse_das_variable(input)?;
+        assert_eq!(name, "sensor_data");
+        assert_eq!(attrs.len(), 6);
+
+        // Check each attribute type
+        assert_eq!(attrs["quality_flag"].data_type, DataType::Byte);
+        assert_eq!(attrs["elevation"].data_type, DataType::Int16);
+        assert_eq!(attrs["port_number"].data_type, DataType::UInt16);
+        assert_eq!(attrs["file_size"].data_type, DataType::UInt32);
+        assert_eq!(attrs["precision_value"].data_type, DataType::Float64);
+        assert_eq!(attrs["data_source"].data_type, DataType::URL);
+
+        Ok(())
+    }
 }
