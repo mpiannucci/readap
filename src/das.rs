@@ -161,12 +161,12 @@ pub fn parse_das_attributes(input: &str) -> Result<DasAttributes, Error> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{das::DataValue, data::DataType};
+    use crate::{das::DataValue, data::DataType, errors::Error};
 
     use super::{parse_das_attributes, parse_das_variable, DasAttribute};
 
     #[test]
-    fn parse_attribute() -> Result<(), Box<dyn std::error::Error>> {
+    fn parse_attribute() -> Result<(), Error> {
         let input = r#"String long_name "Longitude";"#;
         let (_, string_value) = DasAttribute::parse(input)?;
         assert_eq!(string_value.data_type, DataType::String);
@@ -203,7 +203,7 @@ mod tests {
     }
 
     #[test]
-    fn parse_variable() -> Result<(), Box<dyn std::error::Error>> {
+    fn parse_variable() -> Result<(), Error> {
         let input = r#"    spectral_wave_density {
         String long_name "Spectral Wave Density";
         String short_name "swden";
@@ -232,7 +232,7 @@ mod tests {
     }
 
     #[test]
-    fn parse_das() -> Result<(), Box<dyn std::error::Error>> {
+    fn parse_das() -> Result<(), Error> {
         let input = r#"Attributes {
     time {
         String long_name "Epoch Time";
