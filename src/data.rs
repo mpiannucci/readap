@@ -390,13 +390,13 @@ mod tests {
     fn test_not_implemented_data_value_iterator() {
         // Test that String and URL types return NotImplemented error
         let dummy_data = [0u8; 16]; // Some dummy data
-        
+
         let result = DataValueIterator::new(&dummy_data, DataType::String);
         assert!(matches!(result, Err(Error::NotImplemented)));
-        
+
         let result = DataValueIterator::new(&dummy_data, DataType::URL);
         assert!(matches!(result, Err(Error::NotImplemented)));
-        
+
         // Test that supported types work
         let result = DataValueIterator::new(&dummy_data, DataType::Int32);
         assert!(result.is_ok());
