@@ -8,12 +8,12 @@ use crate::{
 #[derive(Clone, Debug)]
 pub struct DodsDataset<'a> {
     pub dds: DdsDataset,
-    pub data_bytes: &'a[u8],
+    pub data_bytes: &'a [u8],
 }
 
-impl <'a> DodsDataset<'a> {
+impl<'a> DodsDataset<'a> {
     pub fn from_bytes(bytes: &'a [u8]) -> Result<Self, Error> {
-        let dods_string = String::from_utf8_lossy(&bytes);
+        let dods_string = String::from_utf8_lossy(bytes);
         let (_, dds) = DdsDataset::parse(&dods_string).map_err(|_| Error::ParseError)?;
 
         let binary_data_start = match dods_string.find("Data:\n") {
@@ -53,13 +53,15 @@ impl <'a> DodsDataset<'a> {
 
         match &self.dds.values[index] {
             DdsValue::Array(a) => DataValueIterator::new(
-                &self.data_bytes[offset..offset + a.byte_count() as usize ],
+                &self.data_bytes[offset..offset + a.byte_count()],
                 a.data_type.clone(),
             ),
             DdsValue::Grid(g) => DataValueIterator::new(
-                &self.data_bytes[offset..offset + g.array.byte_count() as usize],
+                &self.data_bytes[offset..offset + g.array.byte_count()],
                 g.array.data_type.clone(),
             ),
+            DdsValue::Structure(_) => Err(Error::NotImplemented),
+            DdsValue::Sequence(_) => Err(Error::NotImplemented),
         }
     }
 
@@ -79,6 +81,8 @@ impl <'a> DodsDataset<'a> {
             DdsValue::Grid(g) => {
                 DataArray::parse(&self.data_bytes[offset..], g.array.data_type.clone())
             }
+            DdsValue::Structure(_) => return Err(Error::NotImplemented),
+            DdsValue::Sequence(_) => return Err(Error::NotImplemented),
         }
         .map_err(|_| Error::ParseError)?;
 
@@ -112,10 +116,12 @@ impl <'a> DodsDataset<'a> {
                         DataArray::parse(&self.data_bytes[position + *acc..], c.data_type.clone())
                             .map_err(|_| Error::ParseError)
                             .map(|(_, a)| (name, a));
-                    *acc = *acc + c.byte_count();
+                    *acc += c.byte_count();
                     Some(data)
                 })
                 .collect(),
+            DdsValue::Structure(_) => Err(Error::NotImplemented),
+            DdsValue::Sequence(_) => Err(Error::NotImplemented),
         }
     }
 }

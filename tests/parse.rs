@@ -72,7 +72,9 @@ fn read_dataset() {
     assert_eq!(mwd_fi, 160);
     assert_eq!(pwd_fi, 168);
 
-    let mwd_unpacked = dataset.variable_data_iter("mean_wave_dir").unwrap()
+    let mwd_unpacked = dataset
+        .variable_data_iter("mean_wave_dir")
+        .unwrap()
         .map(|i| i.try_into().unwrap())
         .collect::<Vec<f64>>();
 

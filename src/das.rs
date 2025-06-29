@@ -34,9 +34,50 @@ impl DasAttribute {
         let (input, _) = tag(";")(input)?;
 
         let value = match data_type {
-            DataType::Int32 => DataValue::Int32(raw_value.parse::<i32>().unwrap()),
-            DataType::Float32 => DataValue::Float32(raw_value.parse::<f32>().unwrap()),
+            DataType::Byte => {
+                let parsed = raw_value.parse::<i8>().map_err(|_| {
+                    nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Digit))
+                })?;
+                DataValue::Byte(parsed)
+            }
+            DataType::Int16 => {
+                let parsed = raw_value.parse::<i16>().map_err(|_| {
+                    nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Digit))
+                })?;
+                DataValue::Int16(parsed)
+            }
+            DataType::UInt16 => {
+                let parsed = raw_value.parse::<u16>().map_err(|_| {
+                    nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Digit))
+                })?;
+                DataValue::UInt16(parsed)
+            }
+            DataType::Int32 => {
+                let parsed = raw_value.parse::<i32>().map_err(|_| {
+                    nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Digit))
+                })?;
+                DataValue::Int32(parsed)
+            }
+            DataType::UInt32 => {
+                let parsed = raw_value.parse::<u32>().map_err(|_| {
+                    nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Digit))
+                })?;
+                DataValue::UInt32(parsed)
+            }
+            DataType::Float32 => {
+                let parsed = raw_value.parse::<f32>().map_err(|_| {
+                    nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Float))
+                })?;
+                DataValue::Float32(parsed)
+            }
+            DataType::Float64 => {
+                let parsed = raw_value.parse::<f64>().map_err(|_| {
+                    nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Float))
+                })?;
+                DataValue::Float64(parsed)
+            }
             DataType::String => DataValue::String(raw_value.replace("\"", "")),
+            DataType::URL => DataValue::URL(raw_value.replace("\"", "")),
         };
 
         Ok((
@@ -120,14 +161,14 @@ pub fn parse_das_attributes(input: &str) -> Result<DasAttributes, Error> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{das::DataValue, data::DataType};
+    use crate::{das::DataValue, data::DataType, errors::Error};
 
     use super::{parse_das_attributes, parse_das_variable, DasAttribute};
 
     #[test]
-    fn parse_attribute() {
+    fn parse_attribute() -> Result<(), Error> {
         let input = r#"String long_name "Longitude";"#;
-        let (_, string_value) = DasAttribute::parse(input).unwrap();
+        let (_, string_value) = DasAttribute::parse(input)?;
         assert_eq!(string_value.data_type, DataType::String);
         assert_eq!(string_value.name, "long_name");
         let value = if let DataValue::String(s) = string_value.value {
@@ -138,7 +179,7 @@ mod tests {
         assert_eq!(value, "Longitude");
 
         let input = "Int32 _FillValue 999;";
-        let (_, int_value) = DasAttribute::parse(input).unwrap();
+        let (_, int_value) = DasAttribute::parse(input)?;
         assert_eq!(int_value.data_type, DataType::Int32);
         assert_eq!(int_value.name, "_FillValue");
         let value = if let DataValue::Int32(i) = int_value.value {
@@ -149,7 +190,7 @@ mod tests {
         assert_eq!(value, 999);
 
         let input = "Float32 _FillValue 999.0;";
-        let (_, float_value) = DasAttribute::parse(input).unwrap();
+        let (_, float_value) = DasAttribute::parse(input)?;
         assert_eq!(float_value.data_type, DataType::Float32);
         assert_eq!(float_value.name, "_FillValue");
         let value = if let DataValue::Float32(f) = float_value.value {
@@ -158,10 +199,11 @@ mod tests {
             0.0
         };
         assert!((value - 999.0).abs() < 0.0001);
+        Ok(())
     }
 
     #[test]
-    fn parse_variable() {
+    fn parse_variable() -> Result<(), Error> {
         let input = r#"    spectral_wave_density {
         String long_name "Spectral Wave Density";
         String short_name "swden";
@@ -170,7 +212,7 @@ mod tests {
         Float32 _FillValue 999.0;
     }"#;
 
-        let (_, (name, attrs)) = parse_das_variable(input).unwrap();
+        let (_, (name, attrs)) = parse_das_variable(input)?;
         assert_eq!(name, "spectral_wave_density");
         assert_eq!(attrs.len(), 5);
         assert_eq!(attrs["long_name"].data_type, DataType::String);
@@ -186,10 +228,11 @@ mod tests {
         } else {
             false
         });
+        Ok(())
     }
 
     #[test]
-    fn parse_das() {
+    fn parse_das() -> Result<(), Error> {
         let input = r#"Attributes {
     time {
         String long_name "Epoch Time";
@@ -204,10 +247,124 @@ mod tests {
         String units "Hz";
     }
 }"#;
-        let attrs = parse_das_attributes(input).unwrap();
+        let attrs = parse_das_attributes(input)?;
 
         assert_eq!(attrs.len(), 2);
         assert!(attrs.contains_key("time"));
         assert!(attrs.contains_key("frequency"));
+        Ok(())
+    }
+
+    #[test]
+    fn parse_invalid_attribute_values() {
+        // Test invalid integer
+        let input = "Int32 _FillValue not_a_number;";
+        let result = DasAttribute::parse(input);
+        assert!(result.is_err());
+
+        // Test invalid float
+        let input = "Float32 _FillValue invalid_float;";
+        let result = DasAttribute::parse(input);
+        assert!(result.is_err());
+
+        // Test invalid byte
+        let input = "Byte quality_flag 999;"; // Out of range for i8
+        let result = DasAttribute::parse(input);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_new_data_type_attributes() {
+        // Test Byte attribute
+        let input = "Byte quality_flag 1;";
+        let (_, attr) = DasAttribute::parse(input).unwrap();
+        assert_eq!(attr.data_type, DataType::Byte);
+        assert_eq!(attr.name, "quality_flag");
+        if let DataValue::Byte(val) = attr.value {
+            assert_eq!(val, 1);
+        } else {
+            panic!("Expected Byte value");
+        }
+
+        // Test Int16 attribute
+        let input = "Int16 elevation -500;";
+        let (_, attr) = DasAttribute::parse(input).unwrap();
+        assert_eq!(attr.data_type, DataType::Int16);
+        assert_eq!(attr.name, "elevation");
+        if let DataValue::Int16(val) = attr.value {
+            assert_eq!(val, -500);
+        } else {
+            panic!("Expected Int16 value");
+        }
+
+        // Test UInt16 attribute
+        let input = "UInt16 port_number 8080;";
+        let (_, attr) = DasAttribute::parse(input).unwrap();
+        assert_eq!(attr.data_type, DataType::UInt16);
+        assert_eq!(attr.name, "port_number");
+        if let DataValue::UInt16(val) = attr.value {
+            assert_eq!(val, 8080);
+        } else {
+            panic!("Expected UInt16 value");
+        }
+
+        // Test UInt32 attribute
+        let input = "UInt32 file_size 4294967295;";
+        let (_, attr) = DasAttribute::parse(input).unwrap();
+        assert_eq!(attr.data_type, DataType::UInt32);
+        assert_eq!(attr.name, "file_size");
+        if let DataValue::UInt32(val) = attr.value {
+            assert_eq!(val, 4294967295);
+        } else {
+            panic!("Expected UInt32 value");
+        }
+
+        // Test Float64 attribute
+        let input = "Float64 precision_value 3.141592653589793;";
+        let (_, attr) = DasAttribute::parse(input).unwrap();
+        assert_eq!(attr.data_type, DataType::Float64);
+        assert_eq!(attr.name, "precision_value");
+        if let DataValue::Float64(val) = attr.value {
+            assert!((val - 3.141592653589793).abs() < 1e-15);
+        } else {
+            panic!("Expected Float64 value");
+        }
+
+        // Test URL attribute
+        let input = r#"URL data_source "http://example.com/data.nc";"#;
+        let (_, attr) = DasAttribute::parse(input).unwrap();
+        assert_eq!(attr.data_type, DataType::URL);
+        assert_eq!(attr.name, "data_source");
+        if let DataValue::URL(val) = attr.value {
+            assert_eq!(val, "http://example.com/data.nc");
+        } else {
+            panic!("Expected URL value");
+        }
+    }
+
+    #[test]
+    fn test_das_variable_with_new_types() -> Result<(), Error> {
+        let input = r#"    sensor_data {
+        Byte quality_flag 1;
+        Int16 elevation -500;
+        UInt16 port_number 8080;
+        UInt32 file_size 4294967295;
+        Float64 precision_value 3.141592653589793;
+        URL data_source "http://example.com/data.nc";
+    }"#;
+
+        let (_, (name, attrs)) = parse_das_variable(input)?;
+        assert_eq!(name, "sensor_data");
+        assert_eq!(attrs.len(), 6);
+
+        // Check each attribute type
+        assert_eq!(attrs["quality_flag"].data_type, DataType::Byte);
+        assert_eq!(attrs["elevation"].data_type, DataType::Int16);
+        assert_eq!(attrs["port_number"].data_type, DataType::UInt16);
+        assert_eq!(attrs["file_size"].data_type, DataType::UInt32);
+        assert_eq!(attrs["precision_value"].data_type, DataType::Float64);
+        assert_eq!(attrs["data_source"].data_type, DataType::URL);
+
+        Ok(())
     }
 }
