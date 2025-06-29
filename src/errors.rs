@@ -1,5 +1,5 @@
-use thiserror::Error;
 use nom;
+use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -18,7 +18,7 @@ pub enum Error {
 }
 
 // Convert nom errors to our custom Error type
-impl<I> From<nom::Err<nom::error::Error<I>>> for Error 
+impl<I> From<nom::Err<nom::error::Error<I>>> for Error
 where
     I: std::fmt::Debug,
 {
@@ -28,7 +28,7 @@ where
 }
 
 // Convert nom::error::Error to our custom Error type
-impl<I> From<nom::error::Error<I>> for Error 
+impl<I> From<nom::error::Error<I>> for Error
 where
     I: std::fmt::Debug,
 {
