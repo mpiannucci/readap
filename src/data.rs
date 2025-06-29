@@ -166,6 +166,14 @@ pub struct DataValueIterator<'a> {
 
 impl<'a> DataValueIterator<'a> {
     pub fn new(data: &'a [u8], data_type: DataType) -> Result<Self, Error> {
+        // Check if the data type is supported for iteration
+        match data_type {
+            DataType::String | DataType::URL => {
+                return Err(Error::NotImplemented);
+            }
+            _ => {}
+        }
+
         let (input, count) =
             be_u32(data).map_err(|_: nom::Err<nom::error::Error<_>>| Error::ParseError)?;
         let (input, count_2) =
@@ -219,8 +227,10 @@ impl<'a> Iterator for DataValueIterator<'a> {
             DataType::Float64 => be_f64(self.input)
                 .map_err(|_: nom::Err<nom::error::Error<_>>| Error::ParseError)
                 .map_or(None, |(input, f)| Some((input, DataValue::Float64(f)))),
-            DataType::String => return None, // TODO: Implement string parsing
-            DataType::URL => return None,    // TODO: Implement URL parsing
+            DataType::String | DataType::URL => {
+                // These types are not supported for iteration and should be caught in new()
+                unreachable!("String and URL types should be rejected in DataValueIterator::new()")
+            }
         }?;
 
         self.input = input;
@@ -278,14 +288,14 @@ impl DataArray {
                 Ok((input, Self::Float64(values)))
             }
             DataType::String => {
-                // TODO: Implement string array parsing
+                // String array parsing is not implemented
                 Err(nom::Err::Error(nom::error::Error::new(
                     input,
                     nom::error::ErrorKind::Tag,
                 )))
             }
             DataType::URL => {
-                // TODO: Implement URL array parsing
+                // URL array parsing is not implemented
                 Err(nom::Err::Error(nom::error::Error::new(
                     input,
                     nom::error::ErrorKind::Tag,
@@ -365,20 +375,30 @@ impl TryInto<Vec<f64>> for DataArray {
 
 #[cfg(test)]
 mod tests {
-    use super::DataType;
+    use super::*;
 
     #[test]
     fn parse_data_type() {
-        let input = "Int32";
-        let (_, dtype) = DataType::parse(input).unwrap();
-        assert_eq!(dtype, DataType::Int32);
+        let (_, data_type) = DataType::parse("Int32").unwrap();
+        assert_eq!(data_type, DataType::Int32);
 
-        let input = "Float32";
-        let (_, dtype) = DataType::parse(input).unwrap();
-        assert_eq!(dtype, DataType::Float32);
+        let (_, data_type) = DataType::parse("Float32").unwrap();
+        assert_eq!(data_type, DataType::Float32);
+    }
 
-        let input = "String";
-        let (_, dtype) = DataType::parse(input).unwrap();
-        assert_eq!(dtype, DataType::String);
+    #[test]
+    fn test_not_implemented_data_value_iterator() {
+        // Test that String and URL types return NotImplemented error
+        let dummy_data = [0u8; 16]; // Some dummy data
+        
+        let result = DataValueIterator::new(&dummy_data, DataType::String);
+        assert!(matches!(result, Err(Error::NotImplemented)));
+        
+        let result = DataValueIterator::new(&dummy_data, DataType::URL);
+        assert!(matches!(result, Err(Error::NotImplemented)));
+        
+        // Test that supported types work
+        let result = DataValueIterator::new(&dummy_data, DataType::Int32);
+        assert!(result.is_ok());
     }
 }
