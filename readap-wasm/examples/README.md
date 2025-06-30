@@ -98,6 +98,16 @@ When running the web viewer, you might encounter CORS (Cross-Origin Resource Sha
 - 🔄 Multi-variable batch processing
 - 💾 Memory-efficient data handling
 
+### Known Issues with Bun
+
+The WASM bindings currently have compatibility issues when running in Bun:
+
+1. **Recursive object error** - Methods that take `&mut self` cause aliasing errors
+2. **Constraint builder** - JavaScript object parsing fails with null pointer errors
+3. **DODS parsing** - Returns "InvalidData" error
+
+**Workaround**: Use `working-example.js` which demonstrates manual URL building and fetch operations that work correctly in Bun.
+
 ### Web Viewer Features
 - 🎨 Interactive grid visualization with color coding
 - 📱 Responsive design for different screen sizes

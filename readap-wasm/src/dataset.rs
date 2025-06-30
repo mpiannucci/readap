@@ -1,4 +1,4 @@
-use crate::{ConstraintBuilder, CoordinateResolver, OpenDAPUrlBuilder};
+use crate::{ConstraintBuilder, CoordinateResolver, OpenDAPUrlBuilder, UniversalFetch};
 use js_sys::{
     Array, Float32Array, Float64Array, Int16Array, Int32Array, Int8Array, Object, Reflect,
     Uint16Array, Uint32Array, Uint8Array,
@@ -7,8 +7,6 @@ use readap::{data::DataArray, parse_das_attributes, DdsDataset, DodsDataset};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use wasm_bindgen::prelude::*;
-use wasm_bindgen_futures::JsFuture;
-use web_sys::{Request, RequestInit, RequestMode, Response};
 
 /// Information about a variable in the dataset
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -28,6 +26,7 @@ pub struct OpenDAPDataset {
     coordinate_resolver: CoordinateResolver,
     variables: HashMap<String, VariableInfo>,
     coordinate_cache: HashMap<String, Array>, // Cache coordinate data as JS arrays
+    fetch_client: UniversalFetch, // Runtime-agnostic fetch client
 }
 
 #[wasm_bindgen]
@@ -37,6 +36,7 @@ impl OpenDAPDataset {
     pub async fn from_url(base_url: &str) -> Result<OpenDAPDataset, JsValue> {
         let url_builder = OpenDAPUrlBuilder::new(base_url);
         let coordinate_resolver = CoordinateResolver::new();
+        let fetch_client = UniversalFetch::new()?;
 
         let mut dataset = OpenDAPDataset {
             url_builder,
@@ -45,6 +45,7 @@ impl OpenDAPDataset {
             coordinate_resolver,
             variables: HashMap::new(),
             coordinate_cache: HashMap::new(),
+            fetch_client,
         };
 
         // Automatically load metadata
@@ -55,18 +56,20 @@ impl OpenDAPDataset {
 
     /// Create a dataset from a base URL without loading metadata (for manual control)
     #[wasm_bindgen(js_name = fromURLLazy)]
-    pub fn from_url_lazy(base_url: &str) -> OpenDAPDataset {
+    pub fn from_url_lazy(base_url: &str) -> Result<OpenDAPDataset, JsValue> {
         let url_builder = OpenDAPUrlBuilder::new(base_url);
         let coordinate_resolver = CoordinateResolver::new();
+        let fetch_client = UniversalFetch::new()?;
 
-        OpenDAPDataset {
+        Ok(OpenDAPDataset {
             url_builder,
             das_data: None,
             dds_data: None,
             coordinate_resolver,
             variables: HashMap::new(),
             coordinate_cache: HashMap::new(),
-        }
+            fetch_client,
+        })
     }
 
     /// Create a dataset from DAS data
@@ -74,6 +77,7 @@ impl OpenDAPDataset {
     pub fn from_das(das_data: &str) -> Result<OpenDAPDataset, JsValue> {
         let url_builder = OpenDAPUrlBuilder::new(""); // No URL needed for DAS-only
         let coordinate_resolver = CoordinateResolver::new();
+        let fetch_client = UniversalFetch::new()?;
 
         let mut dataset = OpenDAPDataset {
             url_builder,
@@ -82,6 +86,7 @@ impl OpenDAPDataset {
             coordinate_resolver,
             variables: HashMap::new(),
             coordinate_cache: HashMap::new(),
+            fetch_client,
         };
 
         dataset.parse_das()?;
@@ -94,6 +99,7 @@ impl OpenDAPDataset {
     pub fn from_dds(dds_data: &str) -> Result<OpenDAPDataset, JsValue> {
         let url_builder = OpenDAPUrlBuilder::new(""); // No URL needed for DDS-only
         let coordinate_resolver = CoordinateResolver::new();
+        let fetch_client = UniversalFetch::new()?;
 
         let mut dataset = OpenDAPDataset {
             url_builder,
@@ -102,6 +108,7 @@ impl OpenDAPDataset {
             coordinate_resolver,
             variables: HashMap::new(),
             coordinate_cache: HashMap::new(),
+            fetch_client,
         };
 
         dataset.parse_dds()?;
@@ -238,7 +245,7 @@ impl OpenDAPDataset {
             self.url_builder.dods_url(Some(constraint_str))
         };
 
-        let dods_data = self.fetch_binary_data(&dods_url).await?;
+        let dods_data = self.fetch_client.fetch_binary(&dods_url).await?;
 
         // Parse and extract the specific variable
         let dods_dataset = DodsDataset::from_bytes(&dods_data)
@@ -316,7 +323,7 @@ impl OpenDAPDataset {
             self.url_builder.dods_url(Some(constraint_str))
         };
 
-        let dods_data = self.fetch_binary_data(&dods_url).await?;
+        let dods_data = self.fetch_client.fetch_binary(&dods_url).await?;
 
         // Parse and extract all requested variables
         let dods_dataset = DodsDataset::from_bytes(&dods_data)
@@ -370,7 +377,7 @@ impl OpenDAPDataset {
         // Fetch coordinate data using a simple constraint
         let constraint_str = format!("{}", var_name);
         let dods_url = self.url_builder.dods_url(Some(constraint_str));
-        let dods_data = self.fetch_binary_data(&dods_url).await?;
+        let dods_data = self.fetch_client.fetch_binary(&dods_url).await?;
 
         // Parse and extract coordinate values
         let dods_dataset = DodsDataset::from_bytes(&dods_data)
@@ -453,13 +460,13 @@ impl OpenDAPDataset {
     async fn load_metadata(&mut self) -> Result<(), JsValue> {
         // Load DAS
         let das_url = self.url_builder.das_url();
-        let das_response = self.fetch_text_data(&das_url).await?;
+        let das_response = self.fetch_client.fetch_text(&das_url).await?;
         self.das_data = Some(das_response);
         self.parse_das()?;
 
         // Load DDS
         let dds_url = self.url_builder.dds_url();
-        let dds_response = self.fetch_text_data(&dds_url).await?;
+        let dds_response = self.fetch_client.fetch_text(&dds_url).await?;
         self.dds_data = Some(dds_response);
         self.parse_dds()?;
 
@@ -503,68 +510,6 @@ impl OpenDAPDataset {
         Ok(())
     }
 
-    /// Fetch text data from a URL
-    async fn fetch_text_data(&self, url: &str) -> Result<String, JsValue> {
-        let mut opts = RequestInit::new();
-        opts.set_method("GET");
-        opts.set_mode(RequestMode::Cors);
-
-        let request = Request::new_with_str_and_init(url, &opts)?;
-        
-        // Try to get the global fetch function - works in both browser and Node.js/Bun
-        let global = js_sys::global();
-        let fetch_fn = js_sys::Reflect::get(&global, &JsValue::from_str("fetch"))?;
-        let fetch_fn = fetch_fn.dyn_into::<js_sys::Function>()?;
-        
-        let resp_value = JsFuture::from(
-            fetch_fn.call1(&global, &request)?
-                .dyn_into::<js_sys::Promise>()?
-        ).await?;
-        let resp: Response = resp_value.dyn_into().unwrap();
-
-        if !resp.ok() {
-            return Err(JsValue::from_str(&format!(
-                "HTTP Error {}: {}",
-                resp.status(),
-                resp.status_text()
-            )));
-        }
-
-        let text = JsFuture::from(resp.text()?).await?;
-        Ok(text.as_string().unwrap())
-    }
-
-    /// Fetch binary data from a URL
-    async fn fetch_binary_data(&self, url: &str) -> Result<Vec<u8>, JsValue> {
-        let mut opts = RequestInit::new();
-        opts.set_method("GET");
-        opts.set_mode(RequestMode::Cors);
-
-        let request = Request::new_with_str_and_init(url, &opts)?;
-        
-        // Try to get the global fetch function - works in both browser and Node.js/Bun
-        let global = js_sys::global();
-        let fetch_fn = js_sys::Reflect::get(&global, &JsValue::from_str("fetch"))?;
-        let fetch_fn = fetch_fn.dyn_into::<js_sys::Function>()?;
-        
-        let resp_value = JsFuture::from(
-            fetch_fn.call1(&global, &request)?
-                .dyn_into::<js_sys::Promise>()?
-        ).await?;
-        let resp: Response = resp_value.dyn_into().unwrap();
-
-        if !resp.ok() {
-            return Err(JsValue::from_str(&format!(
-                "HTTP Error {}: {}",
-                resp.status(),
-                resp.status_text()
-            )));
-        }
-
-        let array_buffer = JsFuture::from(resp.array_buffer()?).await?;
-        let uint8_array = Uint8Array::new(&array_buffer);
-        Ok(uint8_array.to_vec())
-    }
 
     /// Extract coordinate values from DataArray for coordinate resolver
     fn extract_coordinate_values(&self, data_array: &DataArray) -> Result<Array, JsValue> {

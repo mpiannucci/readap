@@ -8,17 +8,17 @@ async function main() {
     try {
         // Create a dataset with automatic metadata fetching
         console.log('Loading dataset metadata...');
-        const dataset = await OpenDAPDataset.fromURL('http://example.com/data.nc');
+        const dataset = await OpenDAPDataset.fromURL('https://compute.earthmover.io/v1/services/dap2/earthmover-demos/gfs/main/solar/opendap');
         
         console.log('Available variables:', dataset.getVariableNames());
         
         // Get variable information
-        const tempInfo = JSON.parse(dataset.getVariableInfo('temperature'));
+        const tempInfo = JSON.parse(dataset.getVariableInfo('t2m'));
         console.log('Temperature variable:', tempInfo);
         
         // Simple data access - no constraints
         console.log('Fetching temperature data...');
-        const tempData = await dataset.getVariable('temperature');
+        const tempData = await dataset.getVariable('t2m');
         console.log('Temperature data type:', tempData.type);
         console.log('Temperature data length:', tempData.length);
         console.log('First 10 values:', tempData.data.slice(0, 10));
@@ -27,30 +27,30 @@ async function main() {
         console.log('Fetching with index-based selection...');
         const indexSelection = dataset.isel({
             time: { type: "single", value: 0 },
-            lat: { type: "range", start: 10, end: 20 }
+            latitude: { type: "range", start: 10, end: 20 }
         });
-        const tempSlice = await dataset.getVariable('temperature', indexSelection);
+        const tempSlice = await dataset.getVariable('t2m', indexSelection);
         console.log('Temperature slice shape:', tempSlice.length);
         
         // Value-based selection (sel) - requires coordinate loading
         console.log('Loading coordinates for value-based selection...');
         await dataset.loadCoordinates('time');
-        await dataset.loadCoordinates('lat');
-        await dataset.loadCoordinates('lon');
+        await dataset.loadCoordinates('latitude');
+        await dataset.loadCoordinates('longitude');
         
         const valueSelection = dataset.sel({
             time: "2023-01-15",  // nearest neighbor
-            lat: [40.0, 50.0],   // range selection
-            lon: -74.0           // single value nearest neighbor
+            latitude: [40.0, 50.0],   // range selection
+            longitude: -74.0           // single value nearest neighbor
         });
         
         console.log('Fetching with value-based selection...');
-        const tempSelected = await dataset.getVariable('temperature', valueSelection);
+        const tempSelected = await dataset.getVariable('t2m', valueSelection);
         console.log('Selected temperature data:', tempSelected);
         
         // Multiple variables at once
         console.log('Fetching multiple variables...');
-        const varNames = ['temperature', 'pressure', 'humidity'];
+        const varNames = ['t2m', 'tcc', 'gust'];
         const multiData = await dataset.getVariables(varNames, indexSelection);
         
         Object.keys(multiData).forEach(varName => {
@@ -60,9 +60,9 @@ async function main() {
         // Chained selections
         const chainedSelection = dataset
             .isel({ time: { type: "single", value: 0 } })
-            .sel({ lat: [40.0, 50.0] });
+            .sel({ latitude: [40.0, 50.0] });
         
-        const chainedData = await dataset.getVariable('temperature', chainedSelection);
+        const chainedData = await dataset.getVariable('t2m', chainedSelection);
         console.log('Chained selection result:', chainedData);
         
     } catch (error) {
@@ -76,7 +76,7 @@ async function lazyExample() {
     
     try {
         // Create dataset without automatic metadata loading
-        const dataset = OpenDAPDataset.fromURLLazy('http://example.com/data.nc');
+        const dataset = OpenDAPDataset.fromURLLazy('https://compute.earthmover.io/v1/services/dap2/earthmover-demos/gfs/main/solar/opendap');
         
         // Manually load metadata when needed
         await dataset.parseDAS(await fetch(dataset.dasUrl()).then(r => r.text()));
@@ -85,7 +85,7 @@ async function lazyExample() {
         console.log('Variables:', dataset.getVariableNames());
         
         // Manual DODS parsing
-        const dodsUrl = dataset.dodsUrl('temperature[0:10]');
+        const dodsUrl = dataset.dodsUrl('t2m[0:10]');
         const dodsResponse = await fetch(dodsUrl);
         const dodsData = new Uint8Array(await dodsResponse.arrayBuffer());
         const parsedData = dataset.parseDODS(dodsData);

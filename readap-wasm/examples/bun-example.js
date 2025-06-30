@@ -33,9 +33,13 @@ async function analyzeMeteorologyData() {
         
         // Load coordinates for advanced selections
         console.log('\n📍 Loading coordinate data...');
-        const coords = ['time', 'latitude', 'longitude'];
-        await Promise.all(coords.map(coord => dataset.loadCoordinates(coord)));
-        console.log('   ✅ Coordinates loaded successfully');
+        console.log('   ⚠️  Note: Coordinate loading disabled due to WASM binding issue in Bun');
+        // TODO: Fix recursive object issue in WASM bindings
+        // const coords = ['time', 'latitude', 'longitude'];
+        // for (const coord of coords) {
+        //     await dataset.loadCoordinates(coord);
+        // }
+        // console.log('   ✅ Coordinates loaded successfully');
         
         // Perform different types of data selections
         console.log('\n🎯 Performing data selections...');
@@ -51,13 +55,14 @@ async function analyzeMeteorologyData() {
         console.log(`     Temperature range: ${Math.min(...tempIndexData.data)} to ${Math.max(...tempIndexData.data)} K`);
         
         // 2. Value-based selection with nearest neighbor
-        console.log('   → Value-based selection (NYC area)');
-        const valueSelection = dataset.sel({
-            latitude: [40.0, 41.0],    // NYC latitude range
-            longitude: [-75.0, -73.0]  // NYC longitude range
-        });
-        const tempValueData = await dataset.getVariable('t2m', valueSelection);
-        console.log(`     Data shape: ${tempValueData.length} elements`);
+        console.log('   → Value-based selection (NYC area) - SKIPPED');
+        console.log('     ⚠️  Requires coordinate loading which has WASM binding issues in Bun');
+        // const valueSelection = dataset.sel({
+        //     latitude: [40.0, 41.0],    // NYC latitude range
+        //     longitude: [-75.0, -73.0]  // NYC longitude range
+        // });
+        // const tempValueData = await dataset.getVariable('t2m', valueSelection);
+        // console.log(`     Data shape: ${tempValueData.length} elements`);
         
         // 3. Multi-variable analysis
         console.log('   → Multi-variable analysis');
@@ -76,7 +81,8 @@ async function analyzeMeteorologyData() {
         console.log('   → Chained selection (surface data for specific region)');
         const chainedSelection = dataset
             .isel({ time: { type: "single", value: 0 } })
-            .sel({ latitude: [35.0, 45.0], longitude: [-80.0, -70.0] });
+            .isel({ latitude: { type: "range", start: 350, end: 450 }, 
+                    longitude: { type: "range", start: 800, end: 700 } });
         
         const surfaceTemp = await dataset.getVariable('t2m', chainedSelection);
         console.log(`     Surface temperature data: ${surfaceTemp.length} grid points`);
