@@ -6,6 +6,7 @@ mod simple_constraint;
 mod universal_dods;
 mod url_builder;
 mod utils;
+mod xarray_dataset;
 
 use wasm_bindgen::prelude::*;
 
@@ -17,6 +18,7 @@ pub use immutable_dataset::*;
 pub use simple_constraint::*;
 pub use universal_dods::*;
 pub use url_builder::*;
+pub use xarray_dataset::*;
 
 #[wasm_bindgen]
 extern "C" {
