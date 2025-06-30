@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use nom::{
+    branch::alt,
     bytes::complete::{tag, take_till, take_until},
     character::complete::{multispace0, newline},
     multi::many_till,
@@ -117,6 +118,27 @@ impl TryInto<f32> for DasAttribute {
 
 pub type DasVariable = HashMap<String, DasAttribute>;
 
+#[derive(Clone, Debug)]
+enum DasItem {
+    Variable(String, DasVariable),
+    GlobalAttribute(DasAttribute),
+}
+
+fn parse_das_item(input: &str) -> IResult<&str, DasItem> {
+    alt((
+        // Try to parse as a variable first (contains {})
+        |input| {
+            let (input, (name, var)) = parse_das_variable(input)?;
+            Ok((input, DasItem::Variable(name, var)))
+        },
+        // If that fails, try to parse as a global attribute
+        |input| {
+            let (input, attr) = preceded(multispace0, DasAttribute::parse)(input)?;
+            Ok((input, DasItem::GlobalAttribute(attr)))
+        },
+    ))(input)
+}
+
 pub fn parse_das_variable(input: &str) -> IResult<&str, (String, DasVariable)> {
     let (input, name) = preceded(multispace0, take_till(char::is_whitespace))(input)?;
     let (input, _) = preceded(multispace0, tag("{"))(input)?;
@@ -141,12 +163,25 @@ fn parse_das_attributes_inner(input: &str) -> IResult<&str, DasAttributes> {
     let (input, _) = tag("Attributes {")(input)?;
     let (input, _) = newline(input)?;
 
-    let (input, (vars, _)) = many_till(terminated(parse_das_variable, newline), tag("}"))(input)?;
+    let (input, (items, _)) = many_till(
+        terminated(parse_das_item, newline), 
+        tag("}")
+    )(input)?;
 
     let mut attributes = HashMap::new();
 
-    vars.into_iter().for_each(|(name, var)| {
-        attributes.insert(name, var);
+    items.into_iter().for_each(|item| {
+        match item {
+            DasItem::Variable(name, var) => {
+                attributes.insert(name, var);
+            }
+            DasItem::GlobalAttribute(attr) => {
+                // Add global attributes to a special __global__ variable
+                let global_key = "__global__".to_string();
+                attributes.entry(global_key).or_insert_with(HashMap::new)
+                    .insert(attr.name.clone(), attr);
+            }
+        }
     });
 
     Ok((input, attributes))
@@ -365,6 +400,97 @@ mod tests {
         assert_eq!(attrs["precision_value"].data_type, DataType::Float64);
         assert_eq!(attrs["data_source"].data_type, DataType::URL);
 
+        Ok(())
+    }
+
+    #[test]
+    fn parse_real_gfs_das() -> Result<(), Error> {
+        // Real DAS data from https://compute.earthmover.io/v1/services/dap2/earthmover-demos/gfs/main/solar/opendap.das
+        let input = r#"Attributes {
+    longitude {
+        String axis "X";
+        String standard_name "longitude";
+        String units "degrees_east";
+        Float64 _FillValue nan;
+    }
+    latitude {
+        String axis "Y";
+        String standard_name "latitude";
+        String units "degrees_north";
+        Float64 _FillValue nan;
+    }
+    time {
+        String axis "T";
+        String standard_name "forecast_reference_time";
+        String units "hours since 2024-05-12T18:00:00";
+        String calendar "proleptic_gregorian";
+    }
+    step {
+        String standard_name "forecast_period";
+        String units "hours";
+    }
+    t2m {
+        Int32 GRIB_NV 0;
+        Int32 GRIB_Nx 1440;
+        Int32 GRIB_Ny 721;
+        String GRIB_cfName "air_temperature";
+        String GRIB_cfVarName "t2m";
+        String GRIB_dataType "fc";
+        String GRIB_gridDefinitionDescription "Latitude/longitude. Also called equidistant cylindrical, or Plate Carree";
+        String GRIB_gridType "regular_ll";
+        Float64 GRIB_iDirectionIncrementInDegrees 0.25;
+        Int32 GRIB_iScansNegatively 0;
+        Float64 GRIB_jDirectionIncrementInDegrees 0.25;
+        Int32 GRIB_jPointsAreConsecutive 0;
+        Int32 GRIB_jScansPositively 0;
+        Float64 GRIB_latitudeOfFirstGridPointInDegrees 90.0;
+        Float64 GRIB_latitudeOfLastGridPointInDegrees -90.0;
+        Float64 GRIB_longitudeOfFirstGridPointInDegrees 0.0;
+        Float64 GRIB_longitudeOfLastGridPointInDegrees 359.75;
+        Float64 GRIB_missingValue 3.4028234663852886e+38;
+        String GRIB_name "2 metre temperature";
+        Int32 GRIB_numberOfPoints 1038240;
+        Int32 GRIB_paramId 167;
+        String GRIB_parameterName "Temperature";
+        String GRIB_parameterUnits "K";
+        String GRIB_shortName "2t";
+        String GRIB_stepRange "0";
+        String GRIB_stepType "instant";
+        Int32 GRIB_stepUnits 1;
+        String GRIB_typeOfLevel "heightAboveGround";
+        String GRIB_units "K";
+        String grid_mapping "gribfile_projection";
+        String long_name "2 metre temperature";
+        String standard_name "air_temperature";
+        String units "K";
+    }
+    String description "GFS data ingested for forecasting demo";
+}"#;
+
+        let attrs = parse_das_attributes(input)?;
+        
+        // Verify basic structure
+        assert!(attrs.contains_key("longitude"));
+        assert!(attrs.contains_key("latitude"));
+        assert!(attrs.contains_key("time"));
+        assert!(attrs.contains_key("step"));
+        assert!(attrs.contains_key("t2m"));
+        
+        // Check coordinate variables
+        let longitude = &attrs["longitude"];
+        assert!(longitude.contains_key("axis"));
+        assert!(longitude.contains_key("standard_name"));
+        assert!(longitude.contains_key("units"));
+        
+        // Check data variable with many attributes
+        let t2m = &attrs["t2m"];
+        assert!(t2m.contains_key("GRIB_name"));
+        assert!(t2m.contains_key("units"));
+        assert!(t2m.contains_key("standard_name"));
+        
+        // Check global description attribute
+        // Note: This is a top-level attribute, not a variable
+        
         Ok(())
     }
 }

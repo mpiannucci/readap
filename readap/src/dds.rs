@@ -70,7 +70,7 @@ impl DdsGrid {
         let (input, _) = newline(input)?;
         let (input, _) = multispace0(input)?;
 
-        let (input, _) = tag("ARRAY:")(input)?;
+        let (input, _) = alt((tag("ARRAY:"), tag("Array:")))(input)?;
         let (input, _) = newline(input)?;
         let (input, _) = multispace0(input)?;
 
@@ -78,7 +78,7 @@ impl DdsGrid {
         let (input, _) = newline(input)?;
         let (input, _) = multispace0(input)?;
 
-        let (input, _) = tag("MAPS:")(input)?;
+        let (input, _) = alt((tag("MAPS:"), tag("Maps:")))(input)?;
         let (input, _) = newline(input)?;
 
         let (input, (coords, _)) = many_till(
@@ -540,5 +540,76 @@ mod tests {
         let (_, sequence) = DdsSequence::parse(input).unwrap();
         assert_eq!(sequence.name, "readings");
         assert_eq!(sequence.fields.len(), 2);
+    }
+
+    #[test]
+    fn test_parse_real_gfs_dds() {
+        // Real DDS data from https://compute.earthmover.io/v1/services/dap2/earthmover-demos/gfs/main/solar/opendap.dds
+        let input = r#"Dataset {
+    Float64 step[step = 209];
+    Float64 longitude[longitude = 1440];
+    Float64 latitude[latitude = 721];
+    Float64 time[time = 1138];
+    Grid {
+      Array:
+        Float32 r2[longitude = 1440][latitude = 721][time = 1138][step = 209];
+      Maps:
+        Float64 longitude[longitude = 1440];
+        Float64 latitude[latitude = 721];
+        Float64 time[time = 1138];
+        Float64 step[step = 209];
+    } r2;
+    Grid {
+      Array:
+        Float32 t2m[longitude = 1440][latitude = 721][time = 1138][step = 209];
+      Maps:
+        Float64 longitude[longitude = 1440];
+        Float64 latitude[latitude = 721];
+        Float64 time[time = 1138];
+        Float64 step[step = 209];
+    } t2m;
+    Grid {
+      Array:
+        Float32 gust[longitude = 1440][latitude = 721][time = 1138][step = 209];
+      Maps:
+        Float64 longitude[longitude = 1440];
+        Float64 latitude[latitude = 721];
+        Float64 time[time = 1138];
+        Float64 step[step = 209];
+    } gust;
+    Grid {
+      Array:
+        Float32 prate[longitude = 1440][latitude = 721][time = 1138][step = 209];
+      Maps:
+        Float64 longitude[longitude = 1440];
+        Float64 latitude[latitude = 721];
+        Float64 time[time = 1138];
+        Float64 step[step = 209];
+    } prate;
+    Grid {
+      Array:
+        Float32 tcc[longitude = 1440][latitude = 721][time = 1138][step = 209];
+      Maps:
+        Float64 longitude[longitude = 1440];
+        Float64 latitude[latitude = 721];
+        Float64 time[time = 1138];
+        Float64 step[step = 209];
+    } tcc;
+} earthmover-demos/gfs/main/solar;"#;
+
+        let result = DdsDataset::parse(input);
+        match result {
+            Ok((_, dataset)) => {
+                // Verify basic structure
+                assert!(dataset.values.len() > 0);
+                println!("✅ DDS parsing successful!");
+                println!("Dataset name: {}", dataset.name);
+                println!("Values: {}", dataset.values.len());
+            }
+            Err(e) => {
+                println!("❌ DDS parsing failed: {:?}", e);
+                panic!("DDS parsing should succeed");
+            }
+        }
     }
 }

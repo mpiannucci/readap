@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ReadAP WASM - OpenDAP Grid Viewer</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            margin: 0;
+            font-size: 2em;
+        }
+        
+        .controls {
+            padding: 20px;
+            border-bottom: 1px solid #eee;
+            background: #fafafa;
+        }
+        
+        .control-group {
+            margin-bottom: 15px;
+        }
+        
+        .control-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        select, button, input {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        
+        button:hover {
+            background: #5a6fd8;
+        }
+        
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .loading {
+            color: #667eea;
+            font-style: italic;
+        }
+        
+        .error {
+            color: #e74c3c;
+            background: #fadbd8;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        
+        .info {
+            background: #e8f4fd;
+            padding: 15px;
+            margin: 15px 0;
+            border-left: 4px solid #667eea;
+        }
+        
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 15px;
+            border-radius: 6px;
+            border: 1px solid #eee;
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .stat-label {
+            color: #666;
+            margin-top: 5px;
+        }
+        
+        .visualization {
+            padding: 20px;
+            min-height: 400px;
+        }
+        
+        .grid-container {
+            margin-top: 20px;
+            overflow: auto;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        
+        .data-grid {
+            display: grid;
+            gap: 1px;
+            background: #ddd;
+            padding: 1px;
+            min-width: 600px;
+        }
+        
+        .grid-cell {
+            background: white;
+            padding: 4px;
+            text-align: center;
+            font-size: 11px;
+            min-height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .coordinate-info {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+        
+        .selection-controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
+        .range-input {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        .range-input input {
+            flex: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🌊 ReadAP WASM Grid Viewer</h1>
+            <p>Interactive OpenDAP Data Visualization</p>
+            <div style="font-size: 0.9em; margin-top: 10px;">
+                <strong>💡 Tip:</strong> If you see CORS errors, run: <code>bun run serve.js</code> in the examples directory
+            </div>
+        </div>
+        
+        <div class="controls">
+            <div class="control-group">
+                <label for="dataset-url">Dataset URL:</label>
+                <input type="text" id="dataset-url" 
+                       value="https://compute.earthmover.io/v1/services/dap2/earthmover-demos/gfs/main/solar/opendap"
+                       style="width: 80%; margin-right: 10px;">
+                <button id="load-dataset">Load Dataset</button>
+            </div>
+            
+            <div class="control-group">
+                <label for="variable-select">Select Variable:</label>
+                <select id="variable-select" disabled>
+                    <option>Load dataset first...</option>
+                </select>
+                <button id="load-variable" disabled>Load Data</button>
+            </div>
+            
+            <div class="selection-controls">
+                <div class="control-group">
+                    <label>Time Selection:</label>
+                    <div class="range-input">
+                        <input type="number" id="time-index" placeholder="Time Index" value="0" min="0">
+                        <span>Index</span>
+                    </div>
+                </div>
+                
+                <div class="control-group">
+                    <label>Latitude Range:</label>
+                    <div class="range-input">
+                        <input type="number" id="lat-start" placeholder="Start" value="0" min="0">
+                        <input type="number" id="lat-end" placeholder="End" value="10" min="0">
+                    </div>
+                </div>
+                
+                <div class="control-group">
+                    <label>Longitude Range:</label>
+                    <div class="range-input">
+                        <input type="number" id="lon-start" placeholder="Start" value="0" min="0">
+                        <input type="number" id="lon-end" placeholder="End" value="10" min="0">
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="visualization">
+            <div id="status"></div>
+            <div id="dataset-info"></div>
+            <div id="variable-stats"></div>
+            <div id="grid-visualization"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        import init, { OpenDAPDataset } from '../pkg/readap_wasm.js';
+        
+        let dataset = null;
+        let currentVariable = null;
+        let currentData = null;
+        
+        // DOM elements
+        const elements = {
+            status: document.getElementById('status'),
+            datasetInfo: document.getElementById('dataset-info'),
+            variableStats: document.getElementById('variable-stats'),
+            gridVisualization: document.getElementById('grid-visualization'),
+            datasetUrl: document.getElementById('dataset-url'),
+            loadDataset: document.getElementById('load-dataset'),
+            variableSelect: document.getElementById('variable-select'),
+            loadVariable: document.getElementById('load-variable'),
+            timeIndex: document.getElementById('time-index'),
+            latStart: document.getElementById('lat-start'),
+            latEnd: document.getElementById('lat-end'),
+            lonStart: document.getElementById('lon-start'),
+            lonEnd: document.getElementById('lon-end')
+        };
+        
+        // Initialize WASM
+        async function initWasm() {
+            try {
+                // Pass the explicit path to the WASM file
+                await init('../pkg/readap_wasm_bg.wasm');
+                setStatus('✅ WASM module initialized', 'info');
+            } catch (error) {
+                console.error('WASM initialization error:', error);
+                let errorMessage = `❌ Failed to initialize WASM: ${error.message}`;
+                
+                // Check for common CORS issues
+                if (error.message.includes('CORS') || error.message.includes('fetch')) {
+                    errorMessage += `
+                        <br><br><strong>🚨 CORS Issue Detected!</strong><br>
+                        To fix this, please run the local development server:<br>
+                        1. Open terminal in the examples directory<br>
+                        2. Run: <code>bun run serve.js</code><br>
+                        3. Open <code>http://localhost:8080</code><br><br>
+                        Alternatively, you can:<br>
+                        • Use a different browser (some are more permissive)<br>
+                        • Run Chrome with <code>--disable-web-security</code> flag<br>
+                        • Host the files on a proper web server
+                    `;
+                }
+                
+                setStatus(errorMessage, 'error');
+            }
+        }
+        
+        // Set status message
+        function setStatus(message, type = 'info') {
+            elements.status.innerHTML = `<div class="${type}">${message}</div>`;
+        }
+        
+        // Load dataset
+        async function loadDataset() {
+            const url = elements.datasetUrl.value.trim();
+            if (!url) {
+                setStatus('Please enter a dataset URL', 'error');
+                return;
+            }
+            
+            try {
+                setStatus('📡 Loading dataset metadata...', 'loading');
+                elements.loadDataset.disabled = true;
+                
+                dataset = await OpenDAPDataset.fromURL(url);
+                const variables = dataset.getVariableNames();
+                
+                // Populate variable selector
+                elements.variableSelect.innerHTML = '';
+                variables.forEach(name => {
+                    const option = document.createElement('option');
+                    option.value = name;
+                    option.textContent = name;
+                    elements.variableSelect.appendChild(option);
+                });
+                
+                elements.variableSelect.disabled = false;
+                elements.loadVariable.disabled = false;
+                
+                // Display dataset info
+                const infoHtml = `
+                    <div class="info">
+                        <h3>📊 Dataset Loaded Successfully</h3>
+                        <p><strong>URL:</strong> ${url}</p>
+                        <p><strong>Variables:</strong> ${variables.length} found</p>
+                        <div class="stats">
+                            ${variables.map(name => `<div class="stat-card">
+                                <div class="stat-label">${name}</div>
+                            </div>`).join('')}
+                        </div>
+                    </div>
+                `;
+                elements.datasetInfo.innerHTML = infoHtml;
+                
+                setStatus('✅ Dataset loaded successfully', 'info');
+                
+            } catch (error) {
+                setStatus(`❌ Failed to load dataset: ${error.message}`, 'error');
+            } finally {
+                elements.loadDataset.disabled = false;
+            }
+        }
+        
+        // Load variable data
+        async function loadVariable() {
+            const varName = elements.variableSelect.value;
+            if (!varName || !dataset) {
+                setStatus('Please select a variable', 'error');
+                return;
+            }
+            
+            try {
+                setStatus(`📊 Loading ${varName} data...`, 'loading');
+                elements.loadVariable.disabled = true;
+                
+                // Get selection parameters
+                const timeIdx = parseInt(elements.timeIndex.value) || 0;
+                const latStart = parseInt(elements.latStart.value) || 0;
+                const latEnd = parseInt(elements.latEnd.value) || 10;
+                const lonStart = parseInt(elements.lonStart.value) || 0;
+                const lonEnd = parseInt(elements.lonEnd.value) || 10;
+                
+                // Create selection
+                const selection = dataset.isel({
+                    time: { type: "single", value: timeIdx },
+                    latitude: { type: "range", start: latStart, end: latEnd },
+                    longitude: { type: "range", start: lonStart, end: lonEnd }
+                });
+                
+                // Load data
+                currentData = await dataset.getVariable(varName, selection);
+                currentVariable = varName;
+                
+                // Display statistics
+                displayVariableStats();
+                
+                // Visualize grid
+                visualizeGrid();
+                
+                setStatus(`✅ ${varName} data loaded successfully`, 'info');
+                
+            } catch (error) {
+                setStatus(`❌ Failed to load variable: ${error.message}`, 'error');
+            } finally {
+                elements.loadVariable.disabled = false;
+            }
+        }
+        
+        // Display variable statistics
+        function displayVariableStats() {
+            if (!currentData) return;
+            
+            const data = Array.from(currentData.data);
+            const min = Math.min(...data);
+            const max = Math.max(...data);
+            const avg = data.reduce((a, b) => a + b, 0) / data.length;
+            const std = Math.sqrt(data.reduce((sum, val) => sum + Math.pow(val - avg, 2), 0) / data.length);
+            
+            const statsHtml = `
+                <div class="stats">
+                    <div class="stat-card">
+                        <div class="stat-value">${data.length}</div>
+                        <div class="stat-label">Data Points</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${min.toFixed(3)}</div>
+                        <div class="stat-label">Minimum</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${max.toFixed(3)}</div>
+                        <div class="stat-label">Maximum</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${avg.toFixed(3)}</div>
+                        <div class="stat-label">Average</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${std.toFixed(3)}</div>
+                        <div class="stat-label">Std Dev</div>
+                    </div>
+                </div>
+            `;
+            elements.variableStats.innerHTML = statsHtml;
+        }
+        
+        // Visualize data as a grid
+        function visualizeGrid() {
+            if (!currentData) return;
+            
+            const data = Array.from(currentData.data);
+            const latRange = parseInt(elements.latEnd.value) - parseInt(elements.latStart.value) + 1;
+            const lonRange = parseInt(elements.lonEnd.value) - parseInt(elements.lonStart.value) + 1;
+            
+            // Calculate color mapping
+            const min = Math.min(...data);
+            const max = Math.max(...data);
+            const range = max - min;
+            
+            const getColor = (value) => {
+                if (range === 0) return 'rgb(128, 128, 128)';
+                const normalized = (value - min) / range;
+                const hue = (1 - normalized) * 240; // Blue to red
+                return `hsl(${hue}, 70%, 50%)`;
+            };
+            
+            let gridHtml = `
+                <h3>🎨 Grid Visualization - ${currentVariable}</h3>
+                <div class="coordinate-info">
+                    <strong>Grid Size:</strong> ${latRange} × ${lonRange} = ${data.length} cells<br>
+                    <strong>Value Range:</strong> ${min.toFixed(3)} to ${max.toFixed(3)}
+                </div>
+                <div class="grid-container">
+                    <div class="data-grid" style="grid-template-columns: repeat(${lonRange}, 1fr);">
+            `;
+            
+            for (let i = 0; i < data.length; i++) {
+                const value = data[i];
+                const color = getColor(value);
+                gridHtml += `
+                    <div class="grid-cell" style="background-color: ${color}; color: white; text-shadow: 1px 1px 1px rgba(0,0,0,0.5);" 
+                         title="Value: ${value.toFixed(3)}">
+                        ${value.toFixed(1)}
+                    </div>
+                `;
+            }
+            
+            gridHtml += `
+                    </div>
+                </div>
+            `;
+            
+            elements.gridVisualization.innerHTML = gridHtml;
+        }
+        
+        // Event listeners
+        elements.loadDataset.addEventListener('click', loadDataset);
+        elements.loadVariable.addEventListener('click', loadVariable);
+        
+        // Auto-load on selection change
+        elements.variableSelect.addEventListener('change', () => {
+            if (elements.variableSelect.value) {
+                loadVariable();
+            }
+        });
+        
+        // Initialize application
+        initWasm();
+        
+        // Optional: Auto-load dataset on page load
+        // loadDataset();
+    </script>
+</body>
+</html>

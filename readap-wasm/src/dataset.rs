@@ -510,8 +510,16 @@ impl OpenDAPDataset {
         opts.set_mode(RequestMode::Cors);
 
         let request = Request::new_with_str_and_init(url, &opts)?;
-        let window = web_sys::window().unwrap();
-        let resp_value = JsFuture::from(window.fetch_with_request(&request)).await?;
+        
+        // Try to get the global fetch function - works in both browser and Node.js/Bun
+        let global = js_sys::global();
+        let fetch_fn = js_sys::Reflect::get(&global, &JsValue::from_str("fetch"))?;
+        let fetch_fn = fetch_fn.dyn_into::<js_sys::Function>()?;
+        
+        let resp_value = JsFuture::from(
+            fetch_fn.call1(&global, &request)?
+                .dyn_into::<js_sys::Promise>()?
+        ).await?;
         let resp: Response = resp_value.dyn_into().unwrap();
 
         if !resp.ok() {
@@ -533,8 +541,16 @@ impl OpenDAPDataset {
         opts.set_mode(RequestMode::Cors);
 
         let request = Request::new_with_str_and_init(url, &opts)?;
-        let window = web_sys::window().unwrap();
-        let resp_value = JsFuture::from(window.fetch_with_request(&request)).await?;
+        
+        // Try to get the global fetch function - works in both browser and Node.js/Bun
+        let global = js_sys::global();
+        let fetch_fn = js_sys::Reflect::get(&global, &JsValue::from_str("fetch"))?;
+        let fetch_fn = fetch_fn.dyn_into::<js_sys::Function>()?;
+        
+        let resp_value = JsFuture::from(
+            fetch_fn.call1(&global, &request)?
+                .dyn_into::<js_sys::Promise>()?
+        ).await?;
         let resp: Response = resp_value.dyn_into().unwrap();
 
         if !resp.ok() {
