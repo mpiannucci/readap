@@ -86,7 +86,7 @@ impl ConstraintBuilder {
 
         self.constraints
             .iter()
-            .map(|constraint| format_variable_constraint(constraint))
+            .map(format_variable_constraint)
             .collect::<Vec<_>>()
             .join(",")
     }
@@ -119,14 +119,14 @@ fn format_variable_constraint(constraint: &VariableConstraint) -> String {
 
 fn format_index_selection(selection: &IndexSelection) -> String {
     match selection {
-        IndexSelection::Single(idx) => format!("[{}]", idx),
-        IndexSelection::Range(start, end) => format!("[{}:{}]", start, end),
-        IndexSelection::Stride(start, stride, end) => format!("[{}:{}:{}]", start, stride, end),
+        IndexSelection::Single(idx) => format!("[{idx}]"),
+        IndexSelection::Range(start, end) => format!("[{start}:{end}]"),
+        IndexSelection::Stride(start, stride, end) => format!("[{start}:{stride}:{end}]"),
         IndexSelection::Multiple(indices) => {
             // For multiple indices, we need multiple constraints
             indices
                 .iter()
-                .map(|idx| format!("[{}]", idx))
+                .map(|idx| format!("[{idx}]"))
                 .collect::<String>()
         }
     }
@@ -188,6 +188,12 @@ impl OpenDAPUrlBuilder {
 pub struct CoordinateResolver {
     // Will be populated with coordinate data when available
     coordinate_cache: HashMap<String, Vec<f64>>,
+}
+
+impl Default for CoordinateResolver {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl CoordinateResolver {
