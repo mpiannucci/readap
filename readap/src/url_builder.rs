@@ -97,7 +97,7 @@ impl UrlBuilder {
                     let mut combined_constraint = variable.clone();
                     for constraint in constraints {
                         for index_range in &constraint.indices {
-                            combined_constraint.push_str(&format!("[{}]", index_range));
+                            combined_constraint.push_str(&format!("[{index_range}]"));
                         }
                     }
                     parts.push(combined_constraint);
@@ -136,7 +136,7 @@ impl UrlBuilder {
     pub fn add_constraint(mut self, constraint: Constraint) -> Self {
         self.constraints
             .entry(constraint.variable.clone())
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(constraint);
         self
     }
@@ -218,7 +218,7 @@ impl std::fmt::Display for Constraint {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.variable)?;
         for index_range in &self.indices {
-            write!(f, "[{}]", index_range)?;
+            write!(f, "[{index_range}]")?;
         }
         Ok(())
     }
@@ -227,12 +227,12 @@ impl std::fmt::Display for Constraint {
 impl std::fmt::Display for IndexRange {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            IndexRange::Single(index) => write!(f, "{}", index),
+            IndexRange::Single(index) => write!(f, "{index}"),
             IndexRange::Range { start, end, stride } => {
                 if let Some(stride) = stride {
-                    write!(f, "{}:{}:{}", start, stride, end)
+                    write!(f, "{start}:{stride}:{end}")
                 } else {
-                    write!(f, "{}:{}", start, end)
+                    write!(f, "{start}:{end}")
                 }
             }
         }
