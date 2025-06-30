@@ -1,9 +1,65 @@
 import { useState, useEffect, useCallback } from 'react'
-import init, { ImmutableDataset, SimpleConstraintBuilder } from '@mattnucc/readap'
+import init, { ImmutableDataset, SimpleConstraintBuilder, universalFetchText } from '@mattnucc/readap'
 import VariableSelector from './VariableSelector'
 import DataVisualization from './DataVisualization'
 
 const DEFAULT_URL = 'https://coastwatch.pfeg.noaa.gov/erddap/griddap/erdMBchla1day'
+
+/**
+ * Parse DDS content to extract dimensions and variable information
+ * This is a workaround for the library's broken dimension parsing
+ */
+function parseDDS(ddsContent) {
+  const dimensions = new Map()
+  const variables = {}
+  
+  const lines = ddsContent.split('\n')
+  
+  for (const line of lines) {
+    const trimmed = line.trim()
+    
+    // Parse coordinate variables: Float64 longitude[longitude = 1440];
+    const coordMatch = trimmed.match(/^(Float\d+|Int\d+)\s+(\w+)\[(\w+)\s*=\s*(\d+)\];$/)
+    if (coordMatch) {
+      const [, dataType, varName, dimName, size] = coordMatch
+      const dimSize = parseInt(size)
+      
+      dimensions.set(dimName, dimSize)
+      variables[varName] = {
+        isCoordinate: true,
+        dimensions: [{ name: dimName, size: dimSize }],
+        shape: [dimSize]
+      }
+      continue
+    }
+    
+    // Parse grid array declarations: Float32 gust[longitude = 1440][latitude = 721][time = 1138][step = 209];
+    const gridMatch = trimmed.match(/^(Float\d+|Int\d+)\s+(\w+)(\[.+\]);$/)
+    if (gridMatch) {
+      const [, dataType, varName, dimString] = gridMatch
+      
+      // Extract all dimensions from [longitude = 1440][latitude = 721]...
+      const dimMatches = [...dimString.matchAll(/\[(\w+)\s*=\s*(\d+)\]/g)]
+      const varDimensions = []
+      const shape = []
+      
+      for (const [, dimName, size] of dimMatches) {
+        const dimSize = parseInt(size)
+        dimensions.set(dimName, dimSize)
+        varDimensions.push({ name: dimName, size: dimSize })
+        shape.push(dimSize)
+      }
+      
+      variables[varName] = {
+        isCoordinate: false,
+        dimensions: varDimensions,
+        shape: shape
+      }
+    }
+  }
+  
+  return { dimensions, variables }
+}
 
 function DatasetBrowser({ onError }) {
   const [wasmInitialized, setWasmInitialized] = useState(false)
@@ -40,28 +96,42 @@ function DatasetBrowser({ onError }) {
       const ds = await ImmutableDataset.fromURL(url)
       setDataset(ds)
 
-      // Parse metadata
-      const variablesInfo = JSON.parse(ds.getVariablesInfo())
-      const varNames = ds.getVariableNames()
+      // Get DDS content and parse it directly (the library's getVariablesInfo has broken dimension parsing)
+      console.log('Fetching DDS to extract dimension information...')
+      const ddsContent = await universalFetchText(ds.ddsUrl())
+      const { dimensions, variables } = parseDDS(ddsContent)
       
+      // Get basic variable info from the library (for data types, etc.)
+      const variablesInfoJson = ds.getVariablesInfo()
+      const basicVarInfo = JSON.parse(variablesInfoJson)
+      
+      // Merge parsed DDS info with basic variable info
+      for (const [varName, varData] of Object.entries(variables)) {
+        if (basicVarInfo[varName]) {
+          basicVarInfo[varName].dimensions = varData.dimensions
+          basicVarInfo[varName].shape = varData.shape
+        }
+      }
+
       // Enhanced metadata with coordinate information
       const enhancedMetadata = {
         url,
-        variables: variablesInfo,
-        variableNames: varNames,
+        variables: basicVarInfo,
+        variableNames: ds.getVariableNames(),
         coordinates: {},
-        variableSizes: {}
+        variableSizes: {},
+        dimensions: dimensions
       }
 
-      // Calculate variable sizes and identify coordinate variables (skip coordinate data fetching for now)
-      for (const [varName, varInfo] of Object.entries(variablesInfo)) {
+      // Calculate variable sizes and identify coordinate variables
+      for (const [varName, varInfo] of Object.entries(basicVarInfo)) {
         // Calculate total size
         const totalSize = varInfo.dimensions 
           ? varInfo.dimensions.reduce((acc, dim) => acc * dim.size, 1)
           : 1
         enhancedMetadata.variableSizes[varName] = totalSize
 
-        // Mark coordinate variables but don't fetch data yet
+        // Mark coordinate variables
         if (varInfo.dimensions?.length === 1 && 
             varInfo.dimensions[0].name === varName) {
           enhancedMetadata.coordinates[varName] = {
@@ -73,14 +143,21 @@ function DatasetBrowser({ onError }) {
         }
       }
 
+      setMetadata(enhancedMetadata)
+
       // Try to fetch coordinate samples in the background (non-blocking)
       setTimeout(async () => {
         for (const [varName, coordInfo] of Object.entries(enhancedMetadata.coordinates)) {
           if (coordInfo.values.length === 0 && coordInfo.size > 0) {
             try {
               console.log(`Background fetching coordinate sample for ${varName}...`)
+              
+              // Fetch just a few coordinate values for preview
+              const maxSample = Math.min(4, coordInfo.size - 1)
+              const constraint = maxSample > 0 ? `${varName}[0:1:${maxSample}]` : `${varName}[0]`
+              
               const coordData = await Promise.race([
-                ds.getVariable(varName, `${varName}[0:1:${Math.min(2, coordInfo.size - 1)}]`),
+                ds.getVariable(varName, constraint),
                 new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000))
               ])
               
@@ -101,9 +178,7 @@ function DatasetBrowser({ onError }) {
             }
           }
         }
-      }, 100) // Start background fetching after a small delay
-
-      setMetadata(enhancedMetadata)
+      }, 1000) // Start background fetching after a delay
 
       console.log('Dataset loaded successfully:', varNames)
     } catch (err) {
@@ -115,55 +190,91 @@ function DatasetBrowser({ onError }) {
   }, [url, wasmInitialized, onError])
 
   const fetchData = useCallback(async () => {
-    if (!dataset || !selectedVariable || !selectedIndices) return
+    if (!dataset || !selectedVariable || !metadata) return
 
     setLoading(true)
     onError(null)
 
     try {
-      // Build constraint using SimpleConstraintBuilder
-      let builder = new SimpleConstraintBuilder()
-      
-      // Add constraints for each dimension
-      Object.entries(selectedIndices).forEach(([dim, value]) => {
-        if (value !== undefined && value !== null) {
-          console.log(`Adding constraint: ${dim}[${value}]`)
-          builder = builder.addSingle(dim, value)
-        }
-      })
+      const varInfo = metadata.variables[selectedVariable]
+      if (!varInfo) {
+        throw new Error(`Variable ${selectedVariable} not found`)
+      }
 
-      const constraint = builder.build()
+      let constraint = ''
+      
+      // Always build a constraint for safety
+      if (varInfo.dimensions && varInfo.dimensions.length > 0) {
+        // Build constraint using SimpleConstraintBuilder
+        let builder = new SimpleConstraintBuilder()
+        
+        // Add constraints for each dimension
+        varInfo.dimensions.forEach(dim => {
+          const selectedIndex = selectedIndices[dim.name]
+          if (selectedIndex !== undefined && selectedIndex !== null) {
+            console.log(`Adding constraint: ${dim.name}[${selectedIndex}]`)
+            builder = builder.addSingle(dim.name, selectedIndex)
+          } else {
+            // Default to first index if none selected
+            console.log(`Adding default constraint: ${dim.name}[0]`)
+            builder = builder.addSingle(dim.name, 0)
+          }
+        })
+
+        constraint = builder.build()
+      }
+
       console.log('Built constraint string:', constraint)
       console.log('Selected indices:', selectedIndices)
+      console.log('Variable dimensions:', varInfo.dimensions)
 
-      // Fetch the data - handle both with and without constraints, with timeout
+      // Always use constraints for safety - never fetch without them for large variables
+      const estimatedSize = varInfo.dimensions 
+        ? varInfo.dimensions.reduce((acc, dim) => acc * dim.size, 1)
+        : 1
+
       let varData
-      const fetchPromise = constraint && constraint.trim() !== '' 
-        ? dataset.getVariable(selectedVariable, constraint)
-        : dataset.getVariable(selectedVariable)
-      
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Data fetch timeout after 15 seconds')), 15000)
-      )
-
-      console.log(`Fetching ${selectedVariable}${constraint ? ` with constraint: ${constraint}` : ' without constraints'}`)
-      varData = await Promise.race([fetchPromise, timeoutPromise])
+      if (constraint && constraint.trim() !== '') {
+        console.log(`Fetching ${selectedVariable} with constraint: ${constraint}`)
+        varData = await Promise.race([
+          dataset.getVariable(selectedVariable, constraint),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Data fetch timeout after 10 seconds')), 10000)
+          )
+        ])
+      } else if (estimatedSize <= 1000) {
+        // Only fetch without constraints for very small variables
+        console.log(`Fetching small variable ${selectedVariable} without constraints (${estimatedSize} elements)`)
+        varData = await Promise.race([
+          dataset.getVariable(selectedVariable),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Data fetch timeout after 10 seconds')), 10000)
+          )
+        ])
+      } else {
+        throw new Error(`Variable too large (${estimatedSize} elements) - constraints required`)
+      }
       
       setData({
         variable: selectedVariable,
         data: Array.from(varData.data),
         dimensions: varData.dimensions,
-        attributes: varData.attributes
+        attributes: varData.attributes,
+        constraint: constraint
       })
 
-      console.log('Data fetched successfully:', varData)
+      console.log('Data fetched successfully:', {
+        variable: selectedVariable,
+        dataLength: varData.data.length,
+        constraint: constraint
+      })
     } catch (err) {
       console.error('Failed to fetch data:', err)
       onError(`Failed to fetch data: ${err.message}`)
     } finally {
       setLoading(false)
     }
-  }, [dataset, selectedVariable, selectedIndices, onError])
+  }, [dataset, selectedVariable, selectedIndices, metadata, onError])
 
   return (
     <div className="dataset-browser">

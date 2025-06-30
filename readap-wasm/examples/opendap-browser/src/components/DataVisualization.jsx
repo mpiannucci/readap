@@ -160,7 +160,10 @@ function DataVisualization({ data, metadata }) {
       <div className="data-info">
         <h3>{data.variable}</h3>
         <p>Data type: {metadata.variables[data.variable]?.data_type}</p>
-        <p>Total values: {data.data.length}</p>
+        <p>Values fetched: {data.data.length}</p>
+        {data.constraint && (
+          <p>Constraint used: <code>{data.constraint}</code></p>
+        )}
         
         {data.attributes && Object.keys(data.attributes).length > 0 && (
           <div className="attributes">
