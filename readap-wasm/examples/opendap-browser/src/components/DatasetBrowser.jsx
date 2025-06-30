@@ -53,7 +53,7 @@ function DatasetBrowser({ onError }) {
         variableSizes: {}
       }
 
-      // Calculate variable sizes and identify coordinate variables
+      // Calculate variable sizes and identify coordinate variables (skip coordinate data fetching for now)
       for (const [varName, varInfo] of Object.entries(variablesInfo)) {
         // Calculate total size
         const totalSize = varInfo.dimensions 
@@ -61,28 +61,47 @@ function DatasetBrowser({ onError }) {
           : 1
         enhancedMetadata.variableSizes[varName] = totalSize
 
-        // If this looks like a coordinate variable (1D, name matches dimension)
+        // Mark coordinate variables but don't fetch data yet
         if (varInfo.dimensions?.length === 1 && 
             varInfo.dimensions[0].name === varName) {
-          try {
-            // Try to fetch a small sample of coordinate values for display
-            console.log(`Fetching coordinate sample for ${varName}...`)
-            const coordData = await ds.getVariable(varName, `${varName}[0:1:${Math.min(4, varInfo.dimensions[0].size - 1)}]`)
-            enhancedMetadata.coordinates[varName] = {
-              values: Array.from(coordData.data),
-              size: varInfo.dimensions[0].size,
-              attributes: varInfo.attributes
-            }
-          } catch (err) {
-            console.warn(`Could not fetch coordinate data for ${varName}:`, err.message)
-            enhancedMetadata.coordinates[varName] = {
-              values: [],
-              size: varInfo.dimensions[0].size,
-              attributes: varInfo.attributes
-            }
+          enhancedMetadata.coordinates[varName] = {
+            values: [], // We'll fetch these on demand
+            size: varInfo.dimensions[0].size,
+            attributes: varInfo.attributes,
+            isCoordinate: true
           }
         }
       }
+
+      // Try to fetch coordinate samples in the background (non-blocking)
+      setTimeout(async () => {
+        for (const [varName, coordInfo] of Object.entries(enhancedMetadata.coordinates)) {
+          if (coordInfo.values.length === 0 && coordInfo.size > 0) {
+            try {
+              console.log(`Background fetching coordinate sample for ${varName}...`)
+              const coordData = await Promise.race([
+                ds.getVariable(varName, `${varName}[0:1:${Math.min(2, coordInfo.size - 1)}]`),
+                new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000))
+              ])
+              
+              // Update metadata with fetched values
+              setMetadata(prev => ({
+                ...prev,
+                coordinates: {
+                  ...prev.coordinates,
+                  [varName]: {
+                    ...prev.coordinates[varName],
+                    values: Array.from(coordData.data)
+                  }
+                }
+              }))
+              console.log(`✓ Background fetched ${coordData.data.length} coordinate values for ${varName}`)
+            } catch (err) {
+              console.warn(`Background coordinate fetch failed for ${varName}:`, err.message)
+            }
+          }
+        }
+      }, 100) // Start background fetching after a small delay
 
       setMetadata(enhancedMetadata)
 
@@ -117,15 +136,18 @@ function DatasetBrowser({ onError }) {
       console.log('Built constraint string:', constraint)
       console.log('Selected indices:', selectedIndices)
 
-      // Fetch the data - handle both with and without constraints
+      // Fetch the data - handle both with and without constraints, with timeout
       let varData
-      if (constraint && constraint.trim() !== '') {
-        console.log(`Fetching ${selectedVariable} with constraint: ${constraint}`)
-        varData = await dataset.getVariable(selectedVariable, constraint)
-      } else {
-        console.log(`Fetching ${selectedVariable} without constraints (scalar or no selection)`)
-        varData = await dataset.getVariable(selectedVariable)
-      }
+      const fetchPromise = constraint && constraint.trim() !== '' 
+        ? dataset.getVariable(selectedVariable, constraint)
+        : dataset.getVariable(selectedVariable)
+      
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Data fetch timeout after 15 seconds')), 15000)
+      )
+
+      console.log(`Fetching ${selectedVariable}${constraint ? ` with constraint: ${constraint}` : ' without constraints'}`)
+      varData = await Promise.race([fetchPromise, timeoutPromise])
       
       setData({
         variable: selectedVariable,
