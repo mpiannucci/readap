@@ -277,8 +277,6 @@ impl UniversalFetch {
         }
     }
 
-
-
     /// Universal fetch implementation using js_sys::Reflect for all runtimes
     async fn fetch_generic(
         &self,
