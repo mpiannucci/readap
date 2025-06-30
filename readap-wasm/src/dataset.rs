@@ -26,7 +26,7 @@ pub struct OpenDAPDataset {
     coordinate_resolver: CoordinateResolver,
     variables: HashMap<String, VariableInfo>,
     coordinate_cache: HashMap<String, Array>, // Cache coordinate data as JS arrays
-    fetch_client: UniversalFetch, // Runtime-agnostic fetch client
+    fetch_client: UniversalFetch,             // Runtime-agnostic fetch client
 }
 
 #[wasm_bindgen]
@@ -509,7 +509,6 @@ impl OpenDAPDataset {
 
         Ok(())
     }
-
 
     /// Extract coordinate values from DataArray for coordinate resolver
     fn extract_coordinate_values(&self, data_array: &DataArray) -> Result<Array, JsValue> {

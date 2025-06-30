@@ -1,8 +1,9 @@
 /// Immutable Dataset API that avoids mutable self references
 /// This design prevents "recursive use of an object detected" errors in Bun/Node.js
 /// by always returning new instances instead of mutating existing ones
-
-use crate::{ConstraintBuilder, CoordinateResolver, OpenDAPUrlBuilder, UniversalFetch, UniversalDodsParser};
+use crate::{
+    ConstraintBuilder, CoordinateResolver, OpenDAPUrlBuilder, UniversalDodsParser, UniversalFetch,
+};
 use js_sys::{Array, Object, Reflect, Uint8Array};
 // use readap::DdsDataset; // Not needed for simplified parsing
 use serde::{Deserialize, Serialize};
@@ -121,20 +122,20 @@ impl ImmutableDataset {
     #[wasm_bindgen(js_name = fromURL)]
     pub async fn from_url(base_url: &str) -> Result<ImmutableDataset, JsValue> {
         let mut dataset = Self::new(base_url)?;
-        
+
         // Load DAS data
         let url_builder = OpenDAPUrlBuilder::new(base_url);
         let das_url = url_builder.das_url();
         let das_data = dataset.fetch_client.fetch_text(&das_url).await?;
-        
+
         // Load DDS data
         let dds_url = url_builder.dds_url();
         let dds_data = dataset.fetch_client.fetch_text(&dds_url).await?;
-        
+
         // Create new dataset with loaded metadata
         dataset = dataset.with_das_data(das_data)?;
         dataset = dataset.with_dds_data(dds_data)?;
-        
+
         Ok(dataset)
     }
 
@@ -158,7 +159,7 @@ impl ImmutableDataset {
     #[wasm_bindgen(js_name = withDAS)]
     pub fn with_das_data(&self, das_data: String) -> Result<ImmutableDataset, JsValue> {
         let mut new_config = self.config.clone().with_das_data(das_data);
-        
+
         // Parse DAS data to extract variables
         if let Some(das_content) = &new_config.das_data {
             let variables = Self::parse_das_variables(das_content)?;
@@ -178,7 +179,7 @@ impl ImmutableDataset {
     #[wasm_bindgen(js_name = withDDS)]
     pub fn with_dds_data(&self, dds_data: String) -> Result<ImmutableDataset, JsValue> {
         let mut new_config = self.config.clone().with_dds_data(dds_data);
-        
+
         // Parse DDS data to extract variables
         if let Some(dds_content) = &new_config.dds_data {
             let variables = Self::parse_dds_variables(dds_content)?;
@@ -196,8 +197,15 @@ impl ImmutableDataset {
 
     /// Add coordinate data and return new dataset instance
     #[wasm_bindgen(js_name = withCoordinates)]
-    pub fn with_coordinates(&self, var_name: &str, coords: &Array) -> Result<ImmutableDataset, JsValue> {
-        let new_config = self.config.clone().with_coordinates(var_name.to_string(), coords.clone());
+    pub fn with_coordinates(
+        &self,
+        var_name: &str,
+        coords: &Array,
+    ) -> Result<ImmutableDataset, JsValue> {
+        let new_config = self
+            .config
+            .clone()
+            .with_coordinates(var_name.to_string(), coords.clone());
 
         Ok(ImmutableDataset {
             config: new_config,
@@ -261,7 +269,7 @@ impl ImmutableDataset {
     pub fn sel(&self, selections: &Object) -> Result<ConstraintBuilder, JsValue> {
         let mut builder = ConstraintBuilder::new();
         builder = builder.sel(&selections.clone())?;
-        
+
         // Resolve value-based constraints to index-based using coordinate resolver
         let resolved_builder = self.coordinate_resolver.resolve_constraints(&builder)?;
         Ok(resolved_builder)
@@ -283,14 +291,17 @@ impl ImmutableDataset {
 
         let binary_data = self.fetch_client.fetch_binary(&dods_url).await?;
         let uint8_data = Uint8Array::from(&binary_data[..]);
-        
+
         let parsed_data = self.parse_dods(&uint8_data)?;
-        
+
         // Extract the specific variable
         if let Ok(var_data) = Reflect::get(&parsed_data, &JsValue::from_str(var_name)) {
             Ok(var_data.into())
         } else {
-            Err(JsValue::from_str(&format!("Variable '{}' not found in DODS response", var_name)))
+            Err(JsValue::from_str(&format!(
+                "Variable '{}' not found in DODS response",
+                var_name
+            )))
         }
     }
 
@@ -310,7 +321,7 @@ impl ImmutableDataset {
 
         let binary_data = self.fetch_client.fetch_binary(&dods_url).await?;
         let uint8_data = Uint8Array::from(&binary_data[..]);
-        
+
         self.parse_dods(&uint8_data)
     }
 
@@ -328,7 +339,7 @@ impl ImmutableDataset {
     }
 
     /// Get DDS URL
-    #[wasm_bindgen(js_name = ddsUrl)]  
+    #[wasm_bindgen(js_name = ddsUrl)]
     pub fn dds_url(&self) -> String {
         let url_builder = OpenDAPUrlBuilder::new(&self.base_url);
         url_builder.dds_url()
@@ -358,23 +369,24 @@ impl ImmutableDataset {
 impl ImmutableDataset {
     fn parse_das_variables(das_data: &str) -> Result<HashMap<String, VariableInfo>, JsValue> {
         let mut variables = HashMap::new();
-        
+
         // Simple DAS parsing - this is a simplified version
         // In a real implementation, you'd want more robust parsing
         for line in das_data.lines() {
             if line.trim().starts_with("//") || line.trim().is_empty() {
                 continue;
             }
-            
+
             // Look for attribute declarations
             if line.contains("{") && !line.contains("attributes") {
-                let var_name = line.trim()
+                let var_name = line
+                    .trim()
                     .split_whitespace()
                     .next()
                     .unwrap_or("")
                     .trim_end_matches('{')
                     .to_string();
-                    
+
                 if !var_name.is_empty() && var_name != "attributes" {
                     let var_info = VariableInfo {
                         name: var_name.clone(),
@@ -386,27 +398,31 @@ impl ImmutableDataset {
                 }
             }
         }
-        
+
         Ok(variables)
     }
 
     fn parse_dds_variables(dds_data: &str) -> Result<HashMap<String, VariableInfo>, JsValue> {
         let mut variables = HashMap::new();
-        
+
         // Simple DDS parsing for variable names
         for line in dds_data.lines() {
             let trimmed = line.trim();
-            
+
             // Look for variable declarations like: Float32 temperature[time = 8][lat = 4][lon = 8];
-            if (trimmed.contains("Float32") || trimmed.contains("Float64") || trimmed.contains("Int32")) && trimmed.contains("[") {
+            if (trimmed.contains("Float32")
+                || trimmed.contains("Float64")
+                || trimmed.contains("Int32"))
+                && trimmed.contains("[")
+            {
                 let parts: Vec<&str> = trimmed.split_whitespace().collect();
                 if parts.len() >= 2 {
                     let data_type = parts[0];
                     let var_part = parts[1];
-                    
+
                     if let Some(bracket_pos) = var_part.find('[') {
                         let var_name = var_part[..bracket_pos].to_string();
-                        
+
                         let var_info = VariableInfo {
                             name: var_name.clone(),
                             data_type: data_type.to_string(),

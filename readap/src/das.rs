@@ -163,10 +163,7 @@ fn parse_das_attributes_inner(input: &str) -> IResult<&str, DasAttributes> {
     let (input, _) = tag("Attributes {")(input)?;
     let (input, _) = newline(input)?;
 
-    let (input, (items, _)) = many_till(
-        terminated(parse_das_item, newline), 
-        tag("}")
-    )(input)?;
+    let (input, (items, _)) = many_till(terminated(parse_das_item, newline), tag("}"))(input)?;
 
     let mut attributes = HashMap::new();
 
@@ -178,7 +175,9 @@ fn parse_das_attributes_inner(input: &str) -> IResult<&str, DasAttributes> {
             DasItem::GlobalAttribute(attr) => {
                 // Add global attributes to a special __global__ variable
                 let global_key = "__global__".to_string();
-                attributes.entry(global_key).or_insert_with(HashMap::new)
+                attributes
+                    .entry(global_key)
+                    .or_insert_with(HashMap::new)
                     .insert(attr.name.clone(), attr);
             }
         }
@@ -468,29 +467,29 @@ mod tests {
 }"#;
 
         let attrs = parse_das_attributes(input)?;
-        
+
         // Verify basic structure
         assert!(attrs.contains_key("longitude"));
         assert!(attrs.contains_key("latitude"));
         assert!(attrs.contains_key("time"));
         assert!(attrs.contains_key("step"));
         assert!(attrs.contains_key("t2m"));
-        
+
         // Check coordinate variables
         let longitude = &attrs["longitude"];
         assert!(longitude.contains_key("axis"));
         assert!(longitude.contains_key("standard_name"));
         assert!(longitude.contains_key("units"));
-        
+
         // Check data variable with many attributes
         let t2m = &attrs["t2m"];
         assert!(t2m.contains_key("GRIB_name"));
         assert!(t2m.contains_key("units"));
         assert!(t2m.contains_key("standard_name"));
-        
+
         // Check global description attribute
         // Note: This is a top-level attribute, not a variable
-        
+
         Ok(())
     }
 }

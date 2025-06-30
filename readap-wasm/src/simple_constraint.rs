@@ -1,6 +1,6 @@
 use readap::url::{ConstraintBuilder as CoreConstraintBuilder, IndexSelection, ValueSelection};
-use wasm_bindgen::prelude::*;
 use std::collections::HashMap;
+use wasm_bindgen::prelude::*;
 
 /// Simplified constraint builder with method chaining API
 /// This avoids complex JavaScript object parsing that causes issues in Node.js/Bun
@@ -25,7 +25,7 @@ impl SimpleConstraintBuilder {
     pub fn add_single(self, var_name: &str, index: usize) -> SimpleConstraintBuilder {
         let mut selections = HashMap::new();
         selections.insert(var_name.to_string(), IndexSelection::Single(index));
-        
+
         SimpleConstraintBuilder {
             inner: self.inner.isel(selections),
         }
@@ -36,7 +36,7 @@ impl SimpleConstraintBuilder {
     pub fn add_range(self, var_name: &str, start: usize, end: usize) -> SimpleConstraintBuilder {
         let mut selections = HashMap::new();
         selections.insert(var_name.to_string(), IndexSelection::Range(start, end));
-        
+
         SimpleConstraintBuilder {
             inner: self.inner.isel(selections),
         }
@@ -44,10 +44,19 @@ impl SimpleConstraintBuilder {
 
     /// Add a stride constraint (e.g., time[0:2:10])
     #[wasm_bindgen(js_name = addStride)]
-    pub fn add_stride(self, var_name: &str, start: usize, stride: usize, end: usize) -> SimpleConstraintBuilder {
+    pub fn add_stride(
+        self,
+        var_name: &str,
+        start: usize,
+        stride: usize,
+        end: usize,
+    ) -> SimpleConstraintBuilder {
         let mut selections = HashMap::new();
-        selections.insert(var_name.to_string(), IndexSelection::Stride(start, stride, end));
-        
+        selections.insert(
+            var_name.to_string(),
+            IndexSelection::Stride(start, stride, end),
+        );
+
         SimpleConstraintBuilder {
             inner: self.inner.isel(selections),
         }
@@ -57,8 +66,11 @@ impl SimpleConstraintBuilder {
     #[wasm_bindgen(js_name = addMultiple)]
     pub fn add_multiple(self, var_name: &str, indices: &[usize]) -> SimpleConstraintBuilder {
         let mut selections = HashMap::new();
-        selections.insert(var_name.to_string(), IndexSelection::Multiple(indices.to_vec()));
-        
+        selections.insert(
+            var_name.to_string(),
+            IndexSelection::Multiple(indices.to_vec()),
+        );
+
         SimpleConstraintBuilder {
             inner: self.inner.isel(selections),
         }
@@ -69,7 +81,7 @@ impl SimpleConstraintBuilder {
     pub fn add_value_single(self, var_name: &str, value: f64) -> SimpleConstraintBuilder {
         let mut selections = HashMap::new();
         selections.insert(var_name.to_string(), ValueSelection::Single(value));
-        
+
         SimpleConstraintBuilder {
             inner: self.inner.sel(selections),
         }
@@ -80,7 +92,7 @@ impl SimpleConstraintBuilder {
     pub fn add_value_range(self, var_name: &str, min: f64, max: f64) -> SimpleConstraintBuilder {
         let mut selections = HashMap::new();
         selections.insert(var_name.to_string(), ValueSelection::Range(min, max));
-        
+
         SimpleConstraintBuilder {
             inner: self.inner.sel(selections),
         }
@@ -90,8 +102,11 @@ impl SimpleConstraintBuilder {
     #[wasm_bindgen(js_name = addValueString)]
     pub fn add_value_string(self, var_name: &str, value: &str) -> SimpleConstraintBuilder {
         let mut selections = HashMap::new();
-        selections.insert(var_name.to_string(), ValueSelection::String(value.to_string()));
-        
+        selections.insert(
+            var_name.to_string(),
+            ValueSelection::String(value.to_string()),
+        );
+
         SimpleConstraintBuilder {
             inner: self.inner.sel(selections),
         }
@@ -101,8 +116,11 @@ impl SimpleConstraintBuilder {
     #[wasm_bindgen(js_name = addValueMultiple)]
     pub fn add_value_multiple(self, var_name: &str, values: &[f64]) -> SimpleConstraintBuilder {
         let mut selections = HashMap::new();
-        selections.insert(var_name.to_string(), ValueSelection::Multiple(values.to_vec()));
-        
+        selections.insert(
+            var_name.to_string(),
+            ValueSelection::Multiple(values.to_vec()),
+        );
+
         SimpleConstraintBuilder {
             inner: self.inner.sel(selections),
         }

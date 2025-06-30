@@ -1,6 +1,5 @@
 /// Runtime-agnostic fetch abstraction for readap-wasm
 /// Works across Browser, Node.js, Bun, Deno, and other JavaScript runtimes
-
 use js_sys::{ArrayBuffer, Object, Promise, Reflect, Uint8Array};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
@@ -100,9 +99,11 @@ impl UniversalFetch {
     #[wasm_bindgen(js_name = setDefaultHeaders)]
     pub fn set_default_headers(&mut self, headers: &Object) -> Result<(), JsValue> {
         let headers_obj = Object::new();
-        
+
         // Copy existing headers
-        if let Ok(existing_headers) = Reflect::get(&self.default_options, &JsValue::from_str("headers")) {
+        if let Ok(existing_headers) =
+            Reflect::get(&self.default_options, &JsValue::from_str("headers"))
+        {
             if !existing_headers.is_undefined() {
                 let existing_obj = existing_headers.dyn_into::<Object>()?;
                 let keys = Object::keys(&existing_obj);
@@ -114,7 +115,7 @@ impl UniversalFetch {
                 }
             }
         }
-        
+
         // Add new headers
         let keys = Object::keys(headers);
         for i in 0..keys.length() {
@@ -123,8 +124,12 @@ impl UniversalFetch {
                 Reflect::set(&headers_obj, &JsValue::from_str(&key), &value)?;
             }
         }
-        
-        Reflect::set(&self.default_options, &JsValue::from_str("headers"), &headers_obj)?;
+
+        Reflect::set(
+            &self.default_options,
+            &JsValue::from_str("headers"),
+            &headers_obj,
+        )?;
         Ok(())
     }
 
@@ -189,8 +194,12 @@ impl UniversalFetch {
         let options = Object::new();
 
         // Set method
-        Reflect::set(&options, &JsValue::from_str("method"), &JsValue::from_str("GET"))
-            .unwrap_or_default();
+        Reflect::set(
+            &options,
+            &JsValue::from_str("method"),
+            &JsValue::from_str("GET"),
+        )
+        .unwrap_or_default();
 
         // Set headers
         let headers = Object::new();
@@ -205,8 +214,12 @@ impl UniversalFetch {
         match runtime_info.runtime_type {
             RuntimeType::Browser => {
                 // Browser-specific settings
-                Reflect::set(&options, &JsValue::from_str("mode"), &JsValue::from_str("cors"))
-                    .unwrap_or_default();
+                Reflect::set(
+                    &options,
+                    &JsValue::from_str("mode"),
+                    &JsValue::from_str("cors"),
+                )
+                .unwrap_or_default();
                 Reflect::set(
                     &options,
                     &JsValue::from_str("credentials"),
@@ -252,7 +265,11 @@ impl UniversalFetch {
     }
 
     /// Internal fetch implementation with runtime-specific handling
-    async fn fetch_internal(&self, url: &str, response_type: &str) -> Result<FetchResponse, JsValue> {
+    async fn fetch_internal(
+        &self,
+        url: &str,
+        response_type: &str,
+    ) -> Result<FetchResponse, JsValue> {
         match self.runtime_info.runtime_type {
             RuntimeType::Browser => self.fetch_browser(url, response_type).await,
             RuntimeType::NodeJs | RuntimeType::Bun | RuntimeType::Deno => {
@@ -269,10 +286,14 @@ impl UniversalFetch {
     }
 
     /// Browser-specific fetch implementation
-    async fn fetch_browser(&self, url: &str, response_type: &str) -> Result<FetchResponse, JsValue> {
+    async fn fetch_browser(
+        &self,
+        url: &str,
+        response_type: &str,
+    ) -> Result<FetchResponse, JsValue> {
         let global = js_sys::global();
-        let fetch_fn = Reflect::get(&global, &JsValue::from_str("fetch"))?
-            .dyn_into::<js_sys::Function>()?;
+        let fetch_fn =
+            Reflect::get(&global, &JsValue::from_str("fetch"))?.dyn_into::<js_sys::Function>()?;
 
         // Create request options
         let options = self.create_request_options()?;
@@ -327,15 +348,21 @@ impl UniversalFetch {
         response_type: &str,
     ) -> Result<FetchResponse, JsValue> {
         let global = js_sys::global();
-        let fetch_fn = Reflect::get(&global, &JsValue::from_str("fetch"))?
-            .dyn_into::<js_sys::Function>()?;
+        let fetch_fn =
+            Reflect::get(&global, &JsValue::from_str("fetch"))?.dyn_into::<js_sys::Function>()?;
 
         // Create request options (simplified for non-browser)
         let options = Object::new();
-        Reflect::set(&options, &JsValue::from_str("method"), &JsValue::from_str("GET"))?;
+        Reflect::set(
+            &options,
+            &JsValue::from_str("method"),
+            &JsValue::from_str("GET"),
+        )?;
 
         // Copy headers from default options
-        if let Ok(default_headers) = Reflect::get(&self.default_options, &JsValue::from_str("headers")) {
+        if let Ok(default_headers) =
+            Reflect::get(&self.default_options, &JsValue::from_str("headers"))
+        {
             Reflect::set(&options, &JsValue::from_str("headers"), &default_headers)?;
         }
 
@@ -353,7 +380,9 @@ impl UniversalFetch {
             200 // Assume success if we can't get status
         };
 
-        let status_text = if let Ok(status_text_val) = Reflect::get(&response, &JsValue::from_str("statusText")) {
+        let status_text = if let Ok(status_text_val) =
+            Reflect::get(&response, &JsValue::from_str("statusText"))
+        {
             status_text_val.as_string().unwrap_or_default()
         } else {
             "OK".to_string()
@@ -384,9 +413,12 @@ impl UniversalFetch {
                 FetchData::Text(text)
             }
             "binary" => {
-                let array_buffer_method = Reflect::get(&response, &JsValue::from_str("arrayBuffer"))?
-                    .dyn_into::<js_sys::Function>()?;
-                let array_buffer_promise = array_buffer_method.call0(&response)?.dyn_into::<Promise>()?;
+                let array_buffer_method =
+                    Reflect::get(&response, &JsValue::from_str("arrayBuffer"))?
+                        .dyn_into::<js_sys::Function>()?;
+                let array_buffer_promise = array_buffer_method
+                    .call0(&response)?
+                    .dyn_into::<Promise>()?;
                 let array_buffer_result = JsFuture::from(array_buffer_promise).await?;
                 let array_buffer = array_buffer_result.dyn_into::<ArrayBuffer>()?;
                 let uint8_array = Uint8Array::new(&array_buffer);
@@ -404,7 +436,11 @@ impl UniversalFetch {
     }
 
     /// Generic fetch implementation for unknown runtimes
-    async fn fetch_generic(&self, url: &str, response_type: &str) -> Result<FetchResponse, JsValue> {
+    async fn fetch_generic(
+        &self,
+        url: &str,
+        response_type: &str,
+    ) -> Result<FetchResponse, JsValue> {
         // Fallback to the simplest possible fetch implementation
         self.fetch_non_browser(url, response_type).await
     }
