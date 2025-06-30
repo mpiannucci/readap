@@ -7,14 +7,14 @@ Read OpenDAP binary data with pure rust
 with `cargo add`: 
 
 ```bash
-cargo add --git https://github.com/mpiannucci/readap
+cargo add readap
 ```
 
 or `Cargo.toml`: 
 
 ```toml
 [dependencies]
-readap = { git = "https://github.com/mpiannucci/readap" }
+readap = "0.1.0"
 ```
 
 ## Getting Started
@@ -64,4 +64,4 @@ This library is an OpenDAP binary data and metadata parser. It *is not* a data d
 
 ## License
 
-[MIT](LICENSE) - 2023 Matthew Iannucci
+[MIT](LICENSE) - 2025 Matthew Iannucci
