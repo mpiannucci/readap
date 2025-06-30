@@ -48,7 +48,10 @@ wasm-pack test --headless --firefox
 ### Publish to NPM
 
 ```bash
-wasm-pack publish
+wasm-pack build
+cd pkg
+// Change the package name to @mattnucc/readap
+npm publish
 ```
 
 ## Usage
