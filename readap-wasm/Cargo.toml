@@ -27,7 +27,6 @@ features = [
   "Request",
   "RequestInit",
   "RequestMode",
-  "Response",
   "Window",
   "Headers",
   "AbortController",

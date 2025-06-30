@@ -264,29 +264,23 @@ impl UniversalFetch {
         options
     }
 
-    /// Internal fetch implementation with runtime-specific handling
+    /// Internal fetch implementation using unified approach
     async fn fetch_internal(
         &self,
         url: &str,
         response_type: &str,
     ) -> Result<FetchResponse, JsValue> {
-        match self.runtime_info.runtime_type {
-            RuntimeType::Browser => self.fetch_browser(url, response_type).await,
-            RuntimeType::NodeJs | RuntimeType::Bun | RuntimeType::Deno => {
-                self.fetch_non_browser(url, response_type).await
-            }
-            RuntimeType::Unknown => {
-                if self.runtime_info.has_fetch {
-                    self.fetch_generic(url, response_type).await
-                } else {
-                    Err(JsValue::from_str("No fetch implementation available"))
-                }
-            }
+        if self.runtime_info.has_fetch {
+            self.fetch_generic(url, response_type).await
+        } else {
+            Err(JsValue::from_str("No fetch implementation available"))
         }
     }
 
-    /// Browser-specific fetch implementation
-    async fn fetch_browser(
+
+
+    /// Universal fetch implementation using js_sys::Reflect for all runtimes
+    async fn fetch_generic(
         &self,
         url: &str,
         response_type: &str,
@@ -304,76 +298,8 @@ impl UniversalFetch {
             .dyn_into::<Promise>()?;
 
         let response = JsFuture::from(promise).await?;
-        let response_obj = response.dyn_into::<web_sys::Response>()?;
 
-        // Check status
-        if !response_obj.ok() {
-            return Err(JsValue::from_str(&format!(
-                "HTTP Error {}: {}",
-                response_obj.status(),
-                response_obj.status_text()
-            )));
-        }
-
-        // Extract data based on type
-        let data = match response_type {
-            "text" => {
-                let text_promise = response_obj.text()?;
-                let text_result = JsFuture::from(text_promise).await?;
-                let text = text_result.as_string().unwrap_or_default();
-                FetchData::Text(text)
-            }
-            "binary" => {
-                let array_buffer_promise = response_obj.array_buffer()?;
-                let array_buffer_result = JsFuture::from(array_buffer_promise).await?;
-                let array_buffer = array_buffer_result.dyn_into::<ArrayBuffer>()?;
-                let uint8_array = Uint8Array::new(&array_buffer);
-                FetchData::Binary(uint8_array.to_vec())
-            }
-            _ => return Err(JsValue::from_str("Invalid response type")),
-        };
-
-        Ok(FetchResponse {
-            status: response_obj.status(),
-            status_text: response_obj.status_text(),
-            data,
-            headers: Object::new(),
-        })
-    }
-
-    /// Non-browser (Node.js, Bun, Deno) fetch implementation
-    async fn fetch_non_browser(
-        &self,
-        url: &str,
-        response_type: &str,
-    ) -> Result<FetchResponse, JsValue> {
-        let global = js_sys::global();
-        let fetch_fn =
-            Reflect::get(&global, &JsValue::from_str("fetch"))?.dyn_into::<js_sys::Function>()?;
-
-        // Create request options (simplified for non-browser)
-        let options = Object::new();
-        Reflect::set(
-            &options,
-            &JsValue::from_str("method"),
-            &JsValue::from_str("GET"),
-        )?;
-
-        // Copy headers from default options
-        if let Ok(default_headers) =
-            Reflect::get(&self.default_options, &JsValue::from_str("headers"))
-        {
-            Reflect::set(&options, &JsValue::from_str("headers"), &default_headers)?;
-        }
-
-        // Make the fetch call
-        let promise = fetch_fn
-            .call2(&global, &JsValue::from_str(url), &options)?
-            .dyn_into::<Promise>()?;
-
-        let response = JsFuture::from(promise).await?;
-
-        // Extract status - this is the tricky part as different runtimes may have different Response objects
+        // Extract status using Reflect API
         let status = if let Ok(status_val) = Reflect::get(&response, &JsValue::from_str("status")) {
             status_val.as_f64().unwrap_or(0.0) as u16
         } else {
@@ -402,7 +328,7 @@ impl UniversalFetch {
             )));
         }
 
-        // Extract data based on type
+        // Extract data based on type using Reflect API
         let data = match response_type {
             "text" => {
                 let text_method = Reflect::get(&response, &JsValue::from_str("text"))?
@@ -433,16 +359,6 @@ impl UniversalFetch {
             data,
             headers: Object::new(),
         })
-    }
-
-    /// Generic fetch implementation for unknown runtimes
-    async fn fetch_generic(
-        &self,
-        url: &str,
-        response_type: &str,
-    ) -> Result<FetchResponse, JsValue> {
-        // Fallback to the simplest possible fetch implementation
-        self.fetch_non_browser(url, response_type).await
     }
 
     /// Create request options object
