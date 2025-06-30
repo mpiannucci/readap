@@ -2,66 +2,103 @@ name: CI
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main, wasmm ]
   pull_request:
-    branches: [ main, master ]
+    branches: [ main ]
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  test:
-    name: Test
+  test-core:
+    name: Test Core Library
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        rust:
-          - stable
-          - beta
-          - nightly
+        rust: [stable, beta]
     steps:
     - uses: actions/checkout@v4
-    - name: Install Rust
-      uses: dtolnay/rust-toolchain@master
+    - uses: dtolnay/rust-toolchain@master
       with:
         toolchain: ${{ matrix.rust }}
-    - name: Cache cargo registry
-      uses: actions/cache@v3
+    - uses: Swatinem/rust-cache@v2
       with:
-        path: ~/.cargo/registry
-        key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
-    - name: Cache cargo index
-      uses: actions/cache@v3
+        workspaces: readap
+    - name: Run core library tests
+      run: cargo test --manifest-path readap/Cargo.toml --verbose
+
+  test-wasm:
+    name: Test WASM Package
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: dtolnay/rust-toolchain@stable
       with:
-        path: ~/.cargo/git
-        key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
-    - name: Cache cargo build
-      uses: actions/cache@v3
+        targets: wasm32-unknown-unknown
+    - uses: Swatinem/rust-cache@v2
       with:
-        path: target
-        key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
-    - name: Run tests
-      run: cargo test --verbose
+        workspaces: readap-wasm
+    - name: Install wasm-pack
+      run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+    - name: Build WASM package
+      run: wasm-pack build readap-wasm --target web
+    - name: Test WASM package in headless browsers
+      run: wasm-pack test readap-wasm --headless --chrome --firefox
+
+  test-workspace:
+    name: Test Workspace
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: wasm32-unknown-unknown
+    - uses: Swatinem/rust-cache@v2
+    - name: Check workspace
+      run: cargo check --workspace
+    - name: Test workspace
+      run: cargo test --workspace --verbose
+
+  cross-platform:
+    name: Cross Platform
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+    - uses: actions/checkout@v4
+    - uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: wasm32-unknown-unknown
+    - uses: Swatinem/rust-cache@v2
+    - name: Check core library
+      run: cargo check --manifest-path readap/Cargo.toml
+    - name: Check WASM target
+      run: cargo check --manifest-path readap-wasm/Cargo.toml --target wasm32-unknown-unknown
+    - name: Test core library
+      run: cargo test --manifest-path readap/Cargo.toml
 
   clippy:
     name: Clippy
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
-    - name: Install Rust
-      uses: dtolnay/rust-toolchain@stable
+    - uses: dtolnay/rust-toolchain@stable
       with:
         components: clippy
-    - name: Run clippy
-      run: cargo clippy -- -D warnings
+        targets: wasm32-unknown-unknown
+    - uses: Swatinem/rust-cache@v2
+    - name: Run clippy on workspace
+      run: cargo clippy --workspace -- -D warnings
+    - name: Run clippy on WASM target
+      run: cargo clippy --manifest-path readap-wasm/Cargo.toml --target wasm32-unknown-unknown -- -D warnings
 
   fmt:
     name: Rustfmt
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
-    - name: Install Rust
-      uses: dtolnay/rust-toolchain@stable
+    - uses: dtolnay/rust-toolchain@stable
       with:
         components: rustfmt
     - name: Check formatting
