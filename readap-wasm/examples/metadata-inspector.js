@@ -12,11 +12,37 @@
  * - Basic dataset structure
  */
 
+import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 import init, { ImmutableDataset, universalFetchText } from '../pkg/readap_wasm.js';
 
 // Runtime detection
 const isNode = typeof process !== 'undefined' && process.versions && process.versions.node;
 const isBun = typeof Bun !== 'undefined';
+
+/**
+ * Initialize WASM with Node.js compatibility
+ * Node.js cannot fetch file:// URLs, so we need to read the WASM file manually
+ */
+async function initializeWasm() {
+    if (!isNode) {
+        // For non-Node.js environments (Bun, browser), use default initialization
+        await init();
+        return;
+    }
+    
+    try {
+        // For Node.js, manually load the WASM file
+        const scriptDir = dirname(fileURLToPath(import.meta.url));
+        const wasmPath = join(scriptDir, '..', 'pkg', 'readap_wasm_bg.wasm');
+        const wasmBytes = readFileSync(wasmPath);
+        await init(wasmBytes);
+    } catch (error) {
+        console.error('Failed to load WASM file. Make sure you are running from the examples directory.');
+        throw error;
+    }
+}
 
 async function main() {
     // Check command line arguments
@@ -37,16 +63,12 @@ async function main() {
     }
 
     try {
-        // Initialize WebAssembly
-        await init();
+        // Initialize WebAssembly with Node.js compatibility
+        await initializeWasm();
         
         console.log(`Runtime: ${isBun ? 'Bun' : isNode ? 'Node.js' : 'Unknown'}`);
         console.log(`Dataset URL: ${url}`);
         
-        if (isNode) {
-            console.log('Note: Some OpenDAP servers may have networking issues with Node.js');
-            console.log('      If you encounter fetch errors, try using Bun instead');
-        }
         console.log('');
 
         // Load dataset with metadata
