@@ -1,3 +1,6 @@
 [workspace]
+members = [
+    "readap",
+    "readap-wasm",
+]
 resolver = "3"
-members = ["readap"]
