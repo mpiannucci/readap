@@ -114,8 +114,8 @@ function DataVisualization({ data, metadata }) {
     )
   }
 
-  const renderSimpleChart = () => {
-    if (data.data.length === 0 || data.data.length > 100) return null
+  const renderPixelGrid = () => {
+    if (data.data.length === 0) return null
 
     const numericData = data.data.filter(v => typeof v === 'number' && !isNaN(v))
     if (numericData.length === 0) return null
@@ -124,31 +124,111 @@ function DataVisualization({ data, metadata }) {
     const max = Math.max(...numericData)
     const range = max - min
 
-    if (range === 0) return null
+    // Try to infer grid dimensions from data length
+    let gridWidth, gridHeight
+    const totalElements = data.data.length
+
+    if (totalElements === 1) {
+      // Single value - show as 1x1 grid
+      gridWidth = gridHeight = 1
+    } else if (totalElements <= 100) {
+      // For small arrays, try to make a square-ish grid
+      gridWidth = Math.ceil(Math.sqrt(totalElements))
+      gridHeight = Math.ceil(totalElements / gridWidth)
+    } else if (totalElements <= 10000) {
+      // For medium arrays, limit to reasonable display size
+      const maxDim = 100
+      gridWidth = Math.min(maxDim, Math.ceil(Math.sqrt(totalElements)))
+      gridHeight = Math.min(maxDim, Math.ceil(totalElements / gridWidth))
+    } else {
+      // For very large arrays, sample and show warning
+      gridWidth = gridHeight = 50
+    }
+
+    const getColorForValue = (value) => {
+      if (typeof value !== 'number' || isNaN(value)) {
+        return '#ccc' // Gray for invalid values
+      }
+      
+      if (range === 0) {
+        return '#3498db' // Blue for constant values
+      }
+      
+      // Map value to hue (blue to red)
+      const normalized = (value - min) / range
+      const hue = (1 - normalized) * 240 // 240 = blue, 0 = red
+      return `hsl(${hue}, 70%, 50%)`
+    }
+
+    const getIndicesForPosition = (flatIndex) => {
+      // For 1D data, just return the index
+      if (gridHeight === 1) {
+        return `[${flatIndex}]`
+      }
+      
+      // For 2D layout, calculate row/col
+      const row = Math.floor(flatIndex / gridWidth)
+      const col = flatIndex % gridWidth
+      return `[${row}, ${col}]`
+    }
 
     return (
-      <div className="simple-chart">
-        <h4>Data Visualization</h4>
-        <div className="chart-container">
-          {data.data.map((value, index) => {
-            if (typeof value !== 'number' || isNaN(value)) return null
-            
-            const height = range > 0 ? ((value - min) / range) * 100 : 50
-            
-            return (
-              <div 
-                key={index}
-                className="bar"
-                style={{ 
-                  height: `${height}%`,
-                  left: `${(index / data.data.length) * 100}%`,
-                  width: `${100 / data.data.length}%`
-                }}
-                title={`Index ${index}: ${formatValue(value)}`}
-              />
-            )
-          })}
+      <div className="pixel-grid">
+        <h4>Data Visualization ({gridWidth} × {gridHeight} grid)</h4>
+        {totalElements > gridWidth * gridHeight && (
+          <p className="grid-warning">
+            Showing first {gridWidth * gridHeight} of {totalElements} values
+          </p>
+        )}
+        <div className="color-scale">
+          <span className="scale-label">Min: {formatValue(min)}</span>
+          <div className="scale-gradient" style={{
+            background: `linear-gradient(to right, hsl(240, 70%, 50%), hsl(120, 70%, 50%), hsl(0, 70%, 50%))`
+          }}></div>
+          <span className="scale-label">Max: {formatValue(max)}</span>
         </div>
+        <div 
+          className="grid-container"
+          style={{
+            gridTemplateColumns: `repeat(${gridWidth}, 1fr)`,
+            gridTemplateRows: `repeat(${gridHeight}, 1fr)`
+          }}
+        >
+          {data.data.slice(0, gridWidth * gridHeight).map((value, index) => (
+            <div
+              key={index}
+              className="grid-pixel"
+              style={{ backgroundColor: getColorForValue(value) }}
+              title={`Indices ${getIndicesForPosition(index)}: ${formatValue(value)}`}
+              onMouseEnter={(e) => {
+                const tooltip = document.getElementById('pixel-tooltip')
+                if (tooltip) {
+                  tooltip.style.display = 'block'
+                  tooltip.style.left = e.pageX + 10 + 'px'
+                  tooltip.style.top = e.pageY - 10 + 'px'
+                  tooltip.innerHTML = `
+                    <strong>Indices:</strong> ${getIndicesForPosition(index)}<br/>
+                    <strong>Value:</strong> ${formatValue(value)}
+                  `
+                }
+              }}
+              onMouseLeave={() => {
+                const tooltip = document.getElementById('pixel-tooltip')
+                if (tooltip) {
+                  tooltip.style.display = 'none'
+                }
+              }}
+              onMouseMove={(e) => {
+                const tooltip = document.getElementById('pixel-tooltip')
+                if (tooltip) {
+                  tooltip.style.left = e.pageX + 10 + 'px'
+                  tooltip.style.top = e.pageY - 10 + 'px'
+                }
+              }}
+            />
+          ))}
+        </div>
+        <div id="pixel-tooltip" className="pixel-tooltip"></div>
       </div>
     )
   }
@@ -180,7 +260,7 @@ function DataVisualization({ data, metadata }) {
       </div>
 
       {renderStatistics()}
-      {renderSimpleChart()}
+      {renderPixelGrid()}
       {renderDataTable()}
     </section>
   )

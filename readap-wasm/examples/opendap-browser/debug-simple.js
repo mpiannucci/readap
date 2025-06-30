@@ -129,6 +129,80 @@ async function main() {
             console.error('✗ Approach 4 failed:', err.message);
         }
 
+        try {
+            // Approach 5: Multi-variable constraint (like what's failing in the browser)
+            console.log('Approach 5: Multi-variable constraint...');
+            let builder = new SimpleConstraintBuilder();
+            builder = builder.addRange('longitude', 0, 10);
+            builder = builder.addRange('latitude', 0, 10);
+            builder = builder.addRange('time', 1, 2);
+            builder = builder.addRange('step', 1, 2);
+            const constraint = builder.build();
+            console.log('  Built constraint:', constraint);
+            console.log('  Expected: longitude[0:10],latitude[0:10],time[1:2],step[1:2]');
+            
+            // Enable debug mode for DODS parser
+            console.log('  Enabling debug mode and testing...');
+            const dodsUrl = dataset.dodsUrl(constraint);
+            console.log('  DODS URL:', dodsUrl);
+            
+            // Try to fetch a gridded variable that uses these dimensions
+            console.log('  Attempting to fetch gust with constraint...');
+            const gridData = await dataset.getVariable('gust', constraint);
+            console.log('  gridData result:', gridData);
+            
+            if (gridData && gridData.data) {
+                console.log('✓ Fetched gridded data:');
+                console.log('  Data type:', typeof gridData.data);
+                console.log('  Data length:', gridData.data.length);
+                console.log('  First 5 values:', Array.from(gridData.data.slice(0, 5)));
+            } else {
+                console.log('✗ Grid data is undefined or has no data property');
+                console.log('  gridData:', gridData);
+            }
+            console.log('');
+        } catch (err) {
+            console.error('✗ Approach 5 failed:', err.message);
+            console.error('  Full error:', err);
+        }
+
+        try {
+            // Approach 6: Test direct DODS URL construction and parsing
+            console.log('Approach 6: Direct DODS URL test and parsing...');
+            
+            // Construct URL manually like the working curl command
+            const dodsUrl = `${URL}.dods?gust[0:1][0:1][0:1][0:1]`;
+            console.log('  DODS URL:', dodsUrl);
+            
+            // Use the universal fetch to get the data directly
+            const response = await fetch(dodsUrl);
+            const arrayBuffer = await response.arrayBuffer();
+            console.log('✓ Direct DODS fetch successful:');
+            console.log('  Response status:', response.status);
+            console.log('  Content-Type:', response.headers.get('content-type'));
+            console.log('  Data length:', arrayBuffer.byteLength, 'bytes');
+            
+            // Try to parse this data with our parser
+            const uint8Data = new Uint8Array(arrayBuffer);
+            const parsedData = dataset.parseDODS(uint8Data);
+            console.log('  Parsed data:', parsedData);
+            
+            // Check what variables we found
+            if (parsedData) {
+                const keys = Object.keys(parsedData);
+                console.log('  Found variables:', keys);
+                if (keys.includes('gust')) {
+                    console.log('  ✓ gust variable found in parsed data!');
+                    console.log('  gust data:', parsedData.gust);
+                } else {
+                    console.log('  ✗ gust variable NOT found in parsed data');
+                }
+            }
+            console.log('');
+        } catch (err) {
+            console.error('✗ Approach 6 failed:', err.message);
+        }
+
         console.log('=== Debug Complete ===');
 
     } catch (error) {

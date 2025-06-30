@@ -159,6 +159,10 @@ header p {
   border-left: 4px solid #27ae60;
 }
 
+.variable-item.grid-variable {
+  border-left: 4px solid #3498db;
+}
+
 .variable-header {
   display: flex;
   justify-content: space-between;
@@ -179,6 +183,16 @@ header p {
 
 .coord-badge {
   background: #27ae60;
+  color: white;
+  padding: 0.2rem 0.5rem;
+  border-radius: 12px;
+  font-size: 0.7rem;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+.grid-badge {
+  background: #3498db;
   color: white;
   padding: 0.2rem 0.5rem;
   border-radius: 12px;
@@ -277,6 +291,92 @@ header p {
   border-radius: 6px;
   border: 1px solid #e9ecef;
   margin-top: 1rem;
+}
+
+.range-inputs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.range-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.range-label {
+  font-size: 0.85rem;
+  color: #7f8c8d;
+  font-weight: 500;
+}
+
+.range-number {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  text-align: center;
+  font-family: monospace;
+  font-size: 0.9rem;
+}
+
+.range-slider {
+  width: 100%;
+  height: 6px;
+  background: #e9ecef;
+  border-radius: 3px;
+  outline: none;
+  cursor: pointer;
+}
+
+.range-slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  background: #3498db;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.range-slider::-webkit-slider-thumb:hover {
+  background: #2980b9;
+  transform: scale(1.1);
+}
+
+.range-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  background: #3498db;
+  border-radius: 50%;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s;
+}
+
+.range-slider::-moz-range-thumb:hover {
+  background: #2980b9;
+  transform: scale(1.1);
+}
+
+.range-size {
+  color: #3498db;
+  font-weight: 500;
+  font-size: 0.85rem;
+}
+
+.coord-range {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.coord-units {
+  color: #7f8c8d;
+  font-size: 0.8rem;
+  font-style: italic;
 }
 
 .index-selector h3 {
@@ -560,8 +660,8 @@ header p {
   color: #7f8c8d;
 }
 
-/* Simple Chart */
-.simple-chart {
+/* Pixel Grid Visualization */
+.pixel-grid {
   background: white;
   padding: 1rem;
   border-radius: 4px;
@@ -569,30 +669,90 @@ header p {
   margin-bottom: 1.5rem;
 }
 
-.simple-chart h4 {
+.pixel-grid h4 {
   margin-top: 0;
   color: #2c3e50;
+  margin-bottom: 1rem;
 }
 
-.chart-container {
-  height: 200px;
+.grid-warning {
+  color: #e67e22;
+  font-style: italic;
+  margin-bottom: 1rem;
+  padding: 0.5rem;
+  background: #fef9e7;
+  border-radius: 4px;
+  border: 1px solid #f39c12;
+}
+
+.color-scale {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  padding: 0.75rem;
   background: #f8f9fa;
+  border-radius: 4px;
+}
+
+.scale-label {
+  font-size: 0.85rem;
+  color: #2c3e50;
+  font-family: monospace;
+  white-space: nowrap;
+}
+
+.scale-gradient {
+  flex: 1;
+  height: 20px;
+  border-radius: 4px;
+  border: 1px solid #e9ecef;
+}
+
+.grid-container {
+  display: grid;
+  gap: 1px;
+  background: #e9ecef;
   border: 1px solid #e9ecef;
   border-radius: 4px;
-  position: relative;
-  overflow: hidden;
+  padding: 2px;
+  max-width: 600px;
+  max-height: 600px;
+  overflow: auto;
 }
 
-.bar {
+.grid-pixel {
+  aspect-ratio: 1;
+  min-width: 4px;
+  min-height: 4px;
+  cursor: crosshair;
+  transition: all 0.1s;
+  border-radius: 1px;
+}
+
+.grid-pixel:hover {
+  transform: scale(1.2);
+  z-index: 10;
+  border: 2px solid #2c3e50;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+
+.pixel-tooltip {
   position: absolute;
-  bottom: 0;
-  background: #3498db;
-  transition: all 0.2s;
-  cursor: pointer;
+  background: rgba(44, 62, 80, 0.95);
+  color: white;
+  padding: 0.5rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  pointer-events: none;
+  z-index: 1000;
+  display: none;
+  max-width: 200px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
 }
 
-.bar:hover {
-  background: #2980b9;
+.pixel-tooltip strong {
+  color: #3498db;
 }
 
 /* Data Table */

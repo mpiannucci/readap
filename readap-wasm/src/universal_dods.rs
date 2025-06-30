@@ -236,12 +236,21 @@ impl UniversalDodsParser {
     fn parse_dds_info(&self, dds_text: &str) -> Result<Vec<(String, String, Vec<usize>)>, String> {
         let mut variables = Vec::new();
 
-        // Simple DDS parsing - look for Array declarations
-        for line in dds_text.lines() {
-            let trimmed = line.trim();
+        // Parse both simple Arrays and Grid structures
+        let lines: Vec<&str> = dds_text.lines().collect();
+        let mut i = 0;
 
-            // Look for patterns like: Float32 t2m[longitude = 1][latitude = 1]...
-            if trimmed.contains("[")
+        while i < lines.len() {
+            let trimmed = lines[i].trim();
+
+            // Handle Grid structures
+            if trimmed.starts_with("Grid") && trimmed.contains("{") {
+                if let Some(grid_vars) = self.parse_grid_structure(&lines, &mut i) {
+                    variables.extend(grid_vars);
+                }
+            }
+            // Handle simple Array declarations
+            else if trimmed.contains("[")
                 && (trimmed.contains("Float32")
                     || trimmed.contains("Float64")
                     || trimmed.contains("Int32"))
@@ -250,6 +259,8 @@ impl UniversalDodsParser {
                     variables.push(var_info);
                 }
             }
+
+            i += 1;
         }
 
         if variables.is_empty() {
@@ -257,6 +268,80 @@ impl UniversalDodsParser {
         }
 
         Ok(variables)
+    }
+
+    /// Parse Grid structure from DDS lines
+    fn parse_grid_structure(
+        &self,
+        lines: &[&str],
+        index: &mut usize,
+    ) -> Option<Vec<(String, String, Vec<usize>)>> {
+        let mut variables = Vec::new();
+        let start_index = *index;
+        let mut brace_depth = 0;
+        let mut in_array_section = false;
+        let mut grid_name = String::new();
+
+        // Find the end of the Grid structure and extract the grid name
+        for i in start_index..lines.len() {
+            let line = lines[i].trim();
+
+            // Count braces to track nesting
+            brace_depth += line.chars().filter(|&c| c == '{').count();
+            brace_depth -= line.chars().filter(|&c| c == '}').count();
+
+            // Check if we're in the Array section
+            if line.contains("Array:") {
+                in_array_section = true;
+                continue;
+            }
+
+            // Parse array variables within Grid
+            if in_array_section
+                && line.contains("[")
+                && (line.contains("Float32") || line.contains("Float64") || line.contains("Int32"))
+            {
+                if let Some(var_info) = self.parse_variable_declaration(line) {
+                    variables.push(var_info);
+                }
+            }
+
+            // Stop at Maps section
+            if line.contains("Maps:") {
+                in_array_section = false;
+            }
+
+            // Extract grid name from closing line like "} gust;"
+            if brace_depth == 0 && line.contains("}") && line.contains(";") {
+                if let Some(semi_pos) = line.find(';') {
+                    let name_part = line[..semi_pos].trim();
+                    if let Some(space_pos) = name_part.rfind(' ') {
+                        grid_name = name_part[space_pos + 1..].trim().to_string();
+                    } else if let Some(brace_pos) = name_part.find('}') {
+                        grid_name = name_part[brace_pos + 1..].trim().to_string();
+                    }
+                }
+                *index = i;
+                break;
+            }
+        }
+
+        if self.debug_mode && !grid_name.is_empty() {
+            web_sys::console::log_1(
+                &format!(
+                    "Found Grid variable: {} with {} array variables",
+                    grid_name,
+                    variables.len()
+                )
+                .into(),
+            );
+        }
+
+        if variables.is_empty() {
+            None
+        } else {
+            Some(variables)
+        }
     }
 
     /// Parse a single variable declaration line

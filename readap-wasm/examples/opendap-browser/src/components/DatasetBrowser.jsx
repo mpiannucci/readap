@@ -113,6 +113,14 @@ function DatasetBrowser({ onError }) {
         }
       }
 
+      // Detect Grid variables by checking DDS content for Grid patterns
+      const gridPattern = /Grid\s*\{[^}]*\}\s*(\w+);/g
+      let gridMatch
+      const gridVars = new Set()
+      while ((gridMatch = gridPattern.exec(ddsContent)) !== null) {
+        gridVars.add(gridMatch[1])
+      }
+
       // Enhanced metadata with coordinate information
       const enhancedMetadata = {
         url,
@@ -120,7 +128,8 @@ function DatasetBrowser({ onError }) {
         variableNames: ds.getVariableNames(),
         coordinates: {},
         variableSizes: {},
-        dimensions: dimensions
+        dimensions: dimensions,
+        gridVariables: gridVars // Track Grid variables that might not work with constraints
       }
 
       // Calculate variable sizes and identify coordinate variables
@@ -201,41 +210,69 @@ function DatasetBrowser({ onError }) {
         throw new Error(`Variable ${selectedVariable} not found`)
       }
 
+      // For Grid variables, we need to build constraints differently
+      const isGridVariable = metadata.gridVariables && metadata.gridVariables.has(selectedVariable)
+
       let constraint = ''
       
       // Always build a constraint for safety
       if (varInfo.dimensions && varInfo.dimensions.length > 0) {
-        // Build constraint using SimpleConstraintBuilder
-        let builder = new SimpleConstraintBuilder()
-        
-        // Add constraints for each dimension
-        varInfo.dimensions.forEach(dim => {
-          const selectedIndex = selectedIndices[dim.name]
-          if (selectedIndex !== undefined && selectedIndex !== null) {
-            console.log(`Adding constraint: ${dim.name}[${selectedIndex}]`)
-            builder = builder.addSingle(dim.name, selectedIndex)
-          } else {
-            // Default to first index if none selected
-            console.log(`Adding default constraint: ${dim.name}[0]`)
-            builder = builder.addSingle(dim.name, 0)
-          }
-        })
+        if (isGridVariable) {
+          // For Grid variables, build variable-specific constraint: gust[0:1][0:1][0:1][0:1]
+          let constraintParts = []
+          varInfo.dimensions.forEach(dim => {
+            const selectedRange = selectedIndices[dim.name]
+            if (selectedRange && selectedRange.min !== undefined && selectedRange.max !== undefined) {
+              constraintParts.push(`[${selectedRange.min}:${selectedRange.max}]`)
+              console.log(`Adding Grid range constraint: ${dim.name}[${selectedRange.min}:${selectedRange.max}]`)
+            } else {
+              // Default to first index if none selected
+              constraintParts.push(`[0:0]`)
+              console.log(`Adding default Grid constraint: ${dim.name}[0:0]`)
+            }
+          })
+          constraint = `${selectedVariable}${constraintParts.join('')}`
+        } else {
+          // For regular variables, use SimpleConstraintBuilder (original behavior)
+          let builder = new SimpleConstraintBuilder()
+          
+          // Add constraints for each dimension using ranges
+          varInfo.dimensions.forEach(dim => {
+            const selectedRange = selectedIndices[dim.name]
+            if (selectedRange && selectedRange.min !== undefined && selectedRange.max !== undefined) {
+              console.log(`Adding range constraint: ${dim.name}[${selectedRange.min}:${selectedRange.max}]`)
+              builder = builder.addRange(dim.name, selectedRange.min, selectedRange.max)
+            } else {
+              // Default to first index if none selected
+              console.log(`Adding default constraint: ${dim.name}[0:0]`)
+              builder = builder.addRange(dim.name, 0, 0)
+            }
+          })
 
-        constraint = builder.build()
+          constraint = builder.build()
+        }
       }
 
       console.log('Built constraint string:', constraint)
-      console.log('Selected indices:', selectedIndices)
+      console.log('Selected ranges:', selectedIndices)
       console.log('Variable dimensions:', varInfo.dimensions)
 
-      // Always use constraints for safety - never fetch without them for large variables
+      // Calculate size based on selected ranges
       const estimatedSize = varInfo.dimensions 
-        ? varInfo.dimensions.reduce((acc, dim) => acc * dim.size, 1)
+        ? varInfo.dimensions.reduce((acc, dim) => {
+            const selectedRange = selectedIndices[dim.name]
+            if (selectedRange && selectedRange.min !== undefined && selectedRange.max !== undefined) {
+              const rangeSize = Math.max(1, selectedRange.max - selectedRange.min + 1)
+              return acc * rangeSize
+            } else {
+              return acc * 1 // Default single element
+            }
+          }, 1)
         : 1
 
       let varData
       if (constraint && constraint.trim() !== '') {
-        console.log(`Fetching ${selectedVariable} with constraint: ${constraint}`)
+        console.log(`Fetching ${selectedVariable} with constraint: ${constraint} (estimated ${estimatedSize} elements)`)
         varData = await Promise.race([
           dataset.getVariable(selectedVariable, constraint),
           new Promise((_, reject) => 

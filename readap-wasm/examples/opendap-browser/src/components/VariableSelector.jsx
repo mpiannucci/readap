@@ -15,28 +15,36 @@ function VariableSelector({
   const variableSizes = metadata.variableSizes || {}
   const [showCoordinates, setShowCoordinates] = useState({})
 
-  // Reset indices when variable changes
+  // Reset ranges when variable changes
   useEffect(() => {
     if (selectedVariable && variables[selectedVariable]) {
       const varInfo = variables[selectedVariable]
-      const defaultIndices = {}
+      const defaultRanges = {}
       
       if (varInfo.dimensions) {
         varInfo.dimensions.forEach(dim => {
-          defaultIndices[dim.name] = 0 // Default to first index
+          // Default to first few elements for safety
+          const maxSample = Math.min(10, dim.size - 1)
+          defaultRanges[dim.name] = {
+            min: 0,
+            max: maxSample
+          }
         })
       }
       
-      onIndicesChange(defaultIndices)
+      onIndicesChange(defaultRanges)
     }
   }, [selectedVariable, variables, onIndicesChange])
 
-  const handleIndexChange = (dimName, value) => {
+  const handleRangeChange = (dimName, type, value) => {
     const numValue = parseInt(value, 10)
     if (!isNaN(numValue)) {
       onIndicesChange(prev => ({
         ...prev,
-        [dimName]: numValue
+        [dimName]: {
+          ...prev[dimName],
+          [type]: numValue
+        }
       }))
     }
   }
@@ -68,17 +76,19 @@ function VariableSelector({
           const info = variables[name]
           const totalSize = variableSizes[name] || 0
           const isCoordinate = coordinates[name] !== undefined
+          const isGridVariable = metadata.gridVariables && metadata.gridVariables.has(name)
           
           return (
             <div 
               key={name}
-              className={`variable-item ${selectedVariable === name ? 'selected' : ''} ${isCoordinate ? 'coordinate' : ''}`}
+              className={`variable-item ${selectedVariable === name ? 'selected' : ''} ${isCoordinate ? 'coordinate' : ''} ${isGridVariable ? 'grid-variable' : ''}`}
               onClick={() => onVariableSelect(name)}
             >
               <div className="variable-header">
                 <div className="variable-name">
                   <strong>{name}</strong>
                   {isCoordinate && <span className="coord-badge">coordinate</span>}
+                  {isGridVariable && <span className="grid-badge">grid variable</span>}
                 </div>
                 <div className="variable-meta">
                   <span className="type">{info.data_type}</span>
@@ -150,47 +160,84 @@ function VariableSelector({
           {varInfo.dimensions && varInfo.dimensions.length > 0 ? (
             <>
               <div className="dimension-controls">
-                <h4>Select Indices:</h4>
+                <h4>Select Ranges:</h4>
                 {varInfo.dimensions.map(dim => {
                   const coordInfo = coordinates[dim.name]
-                  const currentIndex = selectedIndices[dim.name] || 0
+                  const currentRange = selectedIndices[dim.name] || { min: 0, max: 0 }
+                  const rangeSize = Math.max(1, currentRange.max - currentRange.min + 1)
                   
                   return (
                     <div key={dim.name} className="dimension-control">
                       <div className="dimension-header">
-                        <label className="dimension-label">{dim.name}</label>
+                        <label className="dimension-label">
+                          {dim.name} 
+                          <span className="range-size">({rangeSize} element{rangeSize !== 1 ? 's' : ''})</span>
+                        </label>
                         <span className="dimension-range">0 to {dim.size - 1}</span>
                       </div>
                       
-                      <div className="dimension-input">
-                        <input
-                          type="range"
-                          min="0"
-                          max={dim.size - 1}
-                          value={currentIndex}
-                          onChange={(e) => handleIndexChange(dim.name, e.target.value)}
-                          className="dimension-slider"
-                        />
-                        <input
-                          type="number"
-                          min="0"
-                          max={dim.size - 1}
-                          value={currentIndex}
-                          onChange={(e) => handleIndexChange(dim.name, e.target.value)}
-                          className="dimension-number"
-                        />
+                      <div className="range-inputs">
+                        <div className="range-input-group">
+                          <label className="range-label">Min:</label>
+                          <input
+                            type="number"
+                            min="0"
+                            max={Math.min(currentRange.max, dim.size - 1)}
+                            value={currentRange.min}
+                            onChange={(e) => handleRangeChange(dim.name, 'min', e.target.value)}
+                            className="range-number"
+                          />
+                          <input
+                            type="range"
+                            min="0"
+                            max={Math.min(currentRange.max, dim.size - 1)}
+                            value={currentRange.min}
+                            onChange={(e) => handleRangeChange(dim.name, 'min', e.target.value)}
+                            className="range-slider"
+                          />
+                        </div>
+                        
+                        <div className="range-input-group">
+                          <label className="range-label">Max:</label>
+                          <input
+                            type="number"
+                            min={Math.max(currentRange.min, 0)}
+                            max={dim.size - 1}
+                            value={currentRange.max}
+                            onChange={(e) => handleRangeChange(dim.name, 'max', e.target.value)}
+                            className="range-number"
+                          />
+                          <input
+                            type="range"
+                            min={Math.max(currentRange.min, 0)}
+                            max={dim.size - 1}
+                            value={currentRange.max}
+                            onChange={(e) => handleRangeChange(dim.name, 'max', e.target.value)}
+                            className="range-slider"
+                          />
+                        </div>
                       </div>
 
                       {coordInfo && coordInfo.values.length > 0 && (
                         <div className="coordinate-info">
-                          <span className="coord-label">Coordinate value:</span>
-                          <span className="coord-current">
-                            {currentIndex < coordInfo.values.length 
-                              ? formatCoordinateValue(coordInfo.values[currentIndex])
-                              : `~${formatCoordinateValue(coordInfo.values[coordInfo.values.length - 1])}`
-                            }
-                            {coordInfo.attributes?.units && ` ${coordInfo.attributes.units}`}
-                          </span>
+                          <span className="coord-label">Range values:</span>
+                          <div className="coord-range">
+                            <span className="coord-value">
+                              From: {currentRange.min < coordInfo.values.length 
+                                ? formatCoordinateValue(coordInfo.values[currentRange.min])
+                                : `~${formatCoordinateValue(coordInfo.values[0])}`
+                              }
+                            </span>
+                            <span className="coord-value">
+                              To: {currentRange.max < coordInfo.values.length 
+                                ? formatCoordinateValue(coordInfo.values[currentRange.max])
+                                : `~${formatCoordinateValue(coordInfo.values[coordInfo.values.length - 1])}`
+                              }
+                            </span>
+                            {coordInfo.attributes?.units && (
+                              <span className="coord-units">{coordInfo.attributes.units}</span>
+                            )}
+                          </div>
                         </div>
                       )}
                     </div>
@@ -204,10 +251,10 @@ function VariableSelector({
                   disabled={loading}
                   className="fetch-button"
                 >
-                  {loading ? 'Fetching...' : 'Fetch Single Value'}
+                  {loading ? 'Fetching...' : 'Fetch Range Data'}
                 </button>
                 <div className="fetch-info">
-                  <span className="data-size">Will fetch 1 value at selected indices</span>
+                  <span className="data-size">Will fetch {Object.values(selectedIndices).reduce((total, range) => total * Math.max(1, range.max - range.min + 1), 1)} values</span>
                 </div>
               </div>
             </>
