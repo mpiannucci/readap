@@ -358,6 +358,138 @@ impl DdsDataset {
 
         Ok((input, DdsDataset { name, values }))
     }
+
+    /// Create a new query builder
+    pub fn query(&self, base_url: &str) -> crate::query::DatasetQuery<'_> {
+        crate::query::DatasetQuery::new(self, base_url.to_string())
+    }
+
+    /// List all variable names in the dataset
+    pub fn list_variables(&self) -> Vec<String> {
+        self.values.iter().map(|v| v.name()).collect()
+    }
+
+    /// List all coordinate names in the dataset
+    pub fn list_coordinates(&self) -> Vec<String> {
+        let mut coords = std::collections::HashSet::new();
+
+        for value in &self.values {
+            match value {
+                DdsValue::Array(array) => {
+                    for (coord_name, _) in &array.coords {
+                        coords.insert(coord_name.clone());
+                    }
+                }
+                DdsValue::Grid(grid) => {
+                    for coord in &grid.coords {
+                        coords.insert(coord.name.clone());
+                    }
+                }
+                _ => {} // Structures and sequences don't have coordinates
+            }
+        }
+
+        coords.into_iter().collect()
+    }
+
+    /// Get detailed information about a variable
+    pub fn get_variable_info(&self, name: &str) -> Option<crate::query::VariableInfo> {
+        for value in &self.values {
+            if value.name() == name {
+                return Some(match value {
+                    DdsValue::Array(array) => crate::query::VariableInfo {
+                        name: array.name.clone(),
+                        data_type: array.data_type.clone(),
+                        coordinates: array.coords.iter().map(|(name, _)| name.clone()).collect(),
+                        dimensions: array.coords.clone(),
+                        variable_type: crate::query::VariableType::Array,
+                    },
+                    DdsValue::Grid(grid) => crate::query::VariableInfo {
+                        name: grid.name.clone(),
+                        data_type: grid.array.data_type.clone(),
+                        coordinates: grid.coords.iter().map(|c| c.name.clone()).collect(),
+                        dimensions: grid.array.coords.clone(),
+                        variable_type: crate::query::VariableType::Grid,
+                    },
+                    DdsValue::Structure(structure) => crate::query::VariableInfo {
+                        name: structure.name.clone(),
+                        data_type: crate::data::DataType::String, // Structures don't have a single data type
+                        coordinates: vec![],
+                        dimensions: vec![],
+                        variable_type: crate::query::VariableType::Structure,
+                    },
+                    DdsValue::Sequence(sequence) => crate::query::VariableInfo {
+                        name: sequence.name.clone(),
+                        data_type: crate::data::DataType::String, // Sequences don't have a single data type
+                        coordinates: vec![],
+                        dimensions: vec![],
+                        variable_type: crate::query::VariableType::Sequence,
+                    },
+                });
+            }
+        }
+        None
+    }
+
+    /// Get detailed information about a coordinate
+    pub fn get_coordinate_info(&self, name: &str) -> Option<crate::query::CoordinateInfo> {
+        let mut coord_info = None;
+        let mut variables_using = Vec::new();
+
+        // Find coordinate information and which variables use it
+        for value in &self.values {
+            match value {
+                DdsValue::Array(array) => {
+                    for (coord_name, coord_size) in &array.coords {
+                        if coord_name == name {
+                            if coord_info.is_none() {
+                                coord_info = Some(crate::query::CoordinateInfo {
+                                    name: coord_name.clone(),
+                                    data_type: array.data_type.clone(), // Assume coordinate has same type as array
+                                    size: *coord_size,
+                                    variables_using: vec![],
+                                });
+                            }
+                            variables_using.push(array.name.clone());
+                        }
+                    }
+                }
+                DdsValue::Grid(grid) => {
+                    for coord in &grid.coords {
+                        if coord.name == name {
+                            if coord_info.is_none() {
+                                coord_info = Some(crate::query::CoordinateInfo {
+                                    name: coord.name.clone(),
+                                    data_type: coord.data_type.clone(),
+                                    size: coord.array_length(),
+                                    variables_using: vec![],
+                                });
+                            }
+                            variables_using.push(grid.name.clone());
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        if let Some(mut info) = coord_info {
+            info.variables_using = variables_using;
+            Some(info)
+        } else {
+            None
+        }
+    }
+
+    /// Check if a variable exists in the dataset
+    pub fn has_variable(&self, name: &str) -> bool {
+        self.values.iter().any(|v| v.name() == name)
+    }
+
+    /// Check if a coordinate exists in the dataset
+    pub fn has_coordinate(&self, name: &str) -> bool {
+        self.list_coordinates().contains(&name.to_string())
+    }
 }
 
 #[cfg(test)]
@@ -540,5 +672,93 @@ mod tests {
         let (_, sequence) = DdsSequence::parse(input).unwrap();
         assert_eq!(sequence.name, "readings");
         assert_eq!(sequence.fields.len(), 2);
+    }
+
+    fn create_test_dataset() -> DdsDataset {
+        let dds_content = r#"Dataset {
+    Float32 latitude[latitude = 5];
+    Float32 longitude[longitude = 10];
+    Int32 time[time = 100];
+    Grid {
+     ARRAY:
+        Float32 temperature[time = 100][latitude = 5][longitude = 10];
+     MAPS:
+        Int32 time[time = 100];
+        Float32 latitude[latitude = 5];
+        Float32 longitude[longitude = 10];
+    } temperature;
+    Grid {
+     ARRAY:
+        Float32 wind_speed[time = 100][latitude = 5][longitude = 10];
+     MAPS:
+        Int32 time[time = 100];
+        Float32 latitude[latitude = 5];
+        Float32 longitude[longitude = 10];
+    } wind_speed;
+} test_dataset;"#;
+
+        DdsDataset::from_bytes(dds_content).unwrap()
+    }
+
+    #[test]
+    fn test_dataset_metadata_methods() {
+        let dataset = create_test_dataset();
+
+        let variables = dataset.list_variables();
+        assert_eq!(variables.len(), 5);
+        assert!(variables.contains(&"latitude".to_string()));
+        assert!(variables.contains(&"longitude".to_string()));
+        assert!(variables.contains(&"time".to_string()));
+        assert!(variables.contains(&"temperature".to_string()));
+        assert!(variables.contains(&"wind_speed".to_string()));
+
+        let coordinates = dataset.list_coordinates();
+        assert_eq!(coordinates.len(), 3);
+        assert!(coordinates.contains(&"latitude".to_string()));
+        assert!(coordinates.contains(&"longitude".to_string()));
+        assert!(coordinates.contains(&"time".to_string()));
+
+        assert!(dataset.has_variable("temperature"));
+        assert!(!dataset.has_variable("nonexistent"));
+
+        assert!(dataset.has_coordinate("time"));
+        assert!(!dataset.has_coordinate("nonexistent"));
+    }
+
+    #[test]
+    fn test_variable_info() {
+        let dataset = create_test_dataset();
+
+        let temp_info = dataset.get_variable_info("temperature").unwrap();
+        assert_eq!(temp_info.name, "temperature");
+        assert_eq!(temp_info.data_type, crate::data::DataType::Float32);
+        assert_eq!(temp_info.variable_type, crate::query::VariableType::Grid);
+        assert_eq!(temp_info.coordinates, vec!["time", "latitude", "longitude"]);
+        assert_eq!(temp_info.dimensions.len(), 3);
+        assert_eq!(temp_info.dimensions[0], ("time".to_string(), 100));
+        assert_eq!(temp_info.dimensions[1], ("latitude".to_string(), 5));
+        assert_eq!(temp_info.dimensions[2], ("longitude".to_string(), 10));
+
+        let lat_info = dataset.get_variable_info("latitude").unwrap();
+        assert_eq!(lat_info.variable_type, crate::query::VariableType::Array);
+        assert_eq!(lat_info.coordinates, vec!["latitude"]);
+    }
+
+    #[test]
+    fn test_coordinate_info() {
+        let dataset = create_test_dataset();
+
+        let time_info = dataset.get_coordinate_info("time").unwrap();
+        assert_eq!(time_info.name, "time");
+        assert_eq!(time_info.size, 100);
+        assert!(time_info
+            .variables_using
+            .contains(&"temperature".to_string()));
+        assert!(time_info
+            .variables_using
+            .contains(&"wind_speed".to_string()));
+
+        let lat_info = dataset.get_coordinate_info("latitude").unwrap();
+        assert_eq!(lat_info.size, 5);
     }
 }

@@ -56,6 +56,24 @@ let coords = dataset.variable_coords("mean_wave_dir").unwrap();
 let time_data: Vec<i32> = coords[0].1.try_into().unwrap();
 ```
 
+### Build OpenDAP query URLs
+
+```rs
+let url = dataset.query("https://example.com/data")
+    .select_variable("temperature").unwrap()
+    .dods_url().unwrap();
+```
+
+With coordinate constraints:
+
+```rs
+let url = dataset.query("https://example.com/data")
+    .select_variable("temperature").unwrap()
+    .select_by_coordinate("time", CoordinateConstraint::range(0, 50)).unwrap()
+    .select_by_coordinate("latitude", CoordinateConstraint::single(0)).unwrap()
+    .dods_url().unwrap();
+```
+
 For concrete examples, see the [parse tests](tests/parse.rs)
 
 ## What this library is
