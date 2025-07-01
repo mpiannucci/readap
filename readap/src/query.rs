@@ -70,16 +70,6 @@ pub enum CoordinateConstraint {
     },
     /// Single index constraint
     Single(usize),
-    /// Value-based range constraint (for future enhancement)
-    Values {
-        start: CoordinateValue,
-        end: CoordinateValue,
-        stride: Option<CoordinateValue>,
-    },
-    /// Single value constraint (for future enhancement)
-    SingleValue(CoordinateValue),
-    /// List of specific values (for future enhancement)
-    List(Vec<CoordinateValue>),
 }
 
 impl CoordinateConstraint {
@@ -149,12 +139,6 @@ impl CoordinateConstraint {
                     ));
                 }
             }
-            _ => {
-                // Value-based constraints not implemented yet
-                return Err(QueryError::InvalidCoordinateRange(
-                    "Value-based constraints not yet implemented".to_string(),
-                ));
-            }
         }
         Ok(())
     }
@@ -170,20 +154,8 @@ impl CoordinateConstraint {
                     stride: stride.map(|s| s as isize),
                 }]
             }
-            _ => {
-                // Value-based constraints not implemented yet
-                vec![]
-            }
         }
     }
-}
-
-/// Coordinate value types for value-based constraints
-#[derive(Debug, Clone, PartialEq)]
-pub enum CoordinateValue {
-    Integer(i64),
-    Float(f64),
-    String(String),
 }
 
 /// Variable type enumeration
@@ -268,15 +240,8 @@ impl<'a> DatasetQuery<'a> {
     /// Select multiple variables with validation
     pub fn select_variables(mut self, names: &[&str]) -> Result<Self, QueryError> {
         for name in names {
-            if !self.dataset.has_variable(name) {
-                return Err(QueryError::VariableNotFound(name.to_string()));
-            }
-
-            if !self.selected_variables.contains(&name.to_string()) {
-                self.selected_variables.push(name.to_string());
-            }
+            self = self.select_variable(name)?;
         }
-
         Ok(self)
     }
 
@@ -401,12 +366,10 @@ impl<'a> DatasetQuery<'a> {
                                         range_size
                                     }
                                 }
-                                _ => *coord_size as usize, // Default to full size for unimplemented constraints
                             }
                         } else {
                             *coord_size as usize
                         };
-
                     var_size *= effective_size;
                 }
 
