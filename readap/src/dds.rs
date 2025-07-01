@@ -696,7 +696,7 @@ mod tests {
         Float32 longitude[longitude = 10];
     } wind_speed;
 } test_dataset;"#;
-        
+
         DdsDataset::from_bytes(dds_content).unwrap()
     }
 
@@ -751,8 +751,12 @@ mod tests {
         let time_info = dataset.get_coordinate_info("time").unwrap();
         assert_eq!(time_info.name, "time");
         assert_eq!(time_info.size, 100);
-        assert!(time_info.variables_using.contains(&"temperature".to_string()));
-        assert!(time_info.variables_using.contains(&"wind_speed".to_string()));
+        assert!(time_info
+            .variables_using
+            .contains(&"temperature".to_string()));
+        assert!(time_info
+            .variables_using
+            .contains(&"wind_speed".to_string()));
 
         let lat_info = dataset.get_coordinate_info("latitude").unwrap();
         assert_eq!(lat_info.size, 5);

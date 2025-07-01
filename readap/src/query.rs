@@ -428,7 +428,6 @@ impl<'a> DatasetQuery<'a> {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -504,8 +503,6 @@ mod tests {
         let invalid_range = CoordinateConstraint::range(10, 5);
         assert!(invalid_range.validate("test", 20).is_err()); // Start > end
     }
-
-
 
     #[test]
     fn test_basic_query_building() {
