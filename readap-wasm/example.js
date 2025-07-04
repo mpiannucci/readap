@@ -5,7 +5,7 @@ import {
   parse_dds, 
   parse_das, 
   parse_dods,
-  JsUrlBuilder,
+  UrlBuilder,
   create_query_builder,
   get_variable_info,
   get_coordinate_info
@@ -77,37 +77,37 @@ async function example() {
     const baseUrl = 'https://example.com/data/ocean';
     
     // Basic URL generation
-    let builder = new JsUrlBuilder(baseUrl);
+    let builder = new UrlBuilder(baseUrl);
     console.log('DAS URL:', builder.dasUrl());
     console.log('DDS URL:', builder.ddsUrl());
     console.log('Basic DODS URL:', builder.dodsUrl());
 
     // Variable selection
-    builder = new JsUrlBuilder(baseUrl)
+    builder = new UrlBuilder(baseUrl)
       .addVariable('temperature')
       .addVariable('wind_speed');
     console.log('With variables:', builder.dodsUrl());
 
     // Single index constraint
-    builder = new JsUrlBuilder(baseUrl)
+    builder = new UrlBuilder(baseUrl)
       .addVariable('temperature')
       .addSingleIndex('temperature', 5);
     console.log('With single index:', builder.dodsUrl());
 
     // Range constraint
-    builder = new JsUrlBuilder(baseUrl)
+    builder = new UrlBuilder(baseUrl)
       .addVariable('temperature')
       .addRange('temperature', 0, 10);
     console.log('With range:', builder.dodsUrl());
 
     // Range with stride
-    builder = new JsUrlBuilder(baseUrl)
+    builder = new UrlBuilder(baseUrl)
       .addVariable('temperature')
       .addRangeWithStride('temperature', 0, 20, 2);
     console.log('With stride:', builder.dodsUrl());
 
     // Multidimensional constraint
-    builder = new JsUrlBuilder(baseUrl)
+    builder = new UrlBuilder(baseUrl)
       .addVariable('temperature')
       .addMultidimensionalConstraint('temperature', [
         { start: 0, end: 10 },      // time dimension

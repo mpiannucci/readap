@@ -60,23 +60,23 @@ export interface IndexRange {
   stride?: number;
 }
 
-export class JsUrlBuilder {
+export class UrlBuilder {
   constructor(baseUrl: string);
   
   dasUrl(): string;
   ddsUrl(): string;
   dodsUrl(): string;
   
-  addVariable(variable: string): JsUrlBuilder;
-  addVariables(variables: string[]): JsUrlBuilder;
-  addSingleIndex(variable: string, index: number): JsUrlBuilder;
-  addRange(variable: string, start: number, end: number): JsUrlBuilder;
-  addRangeWithStride(variable: string, start: number, end: number, stride: number): JsUrlBuilder;
-  addMultidimensionalConstraint(variable: string, indices: (number | IndexRange)[]): JsUrlBuilder;
+  addVariable(variable: string): UrlBuilder;
+  addVariables(variables: string[]): UrlBuilder;
+  addSingleIndex(variable: string, index: number): UrlBuilder;
+  addRange(variable: string, start: number, end: number): UrlBuilder;
+  addRangeWithStride(variable: string, start: number, end: number, stride: number): UrlBuilder;
+  addMultidimensionalConstraint(variable: string, indices: (number | IndexRange)[]): UrlBuilder;
   
-  clearVariables(): JsUrlBuilder;
-  clearConstraints(): JsUrlBuilder;
-  clearAll(): JsUrlBuilder;
+  clearVariables(): UrlBuilder;
+  clearConstraints(): UrlBuilder;
+  clearAll(): UrlBuilder;
 }
 
 export function parse_dds(content: string): DdsDataset;

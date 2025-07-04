@@ -6,7 +6,7 @@ use readap::{DdsDataset, DodsDataset, DasAttribute, parse_das_attributes};
 use readap::data::{DataType, DataValue};
 use js_sys::{Array, Object, Reflect};
 
-pub use url_builder::JsUrlBuilder;
+pub use url_builder::UrlBuilder;
 
 #[wasm_bindgen]
 pub fn parse_dds(content: &str) -> Result<JsValue, JsValue> {

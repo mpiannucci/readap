@@ -63,14 +63,14 @@ const coordInfo = get_coordinate_info(ddsContent, 'time');
 ### Improved URL Builder
 ```javascript
 // Correct builder pattern usage
-const url = new JsUrlBuilder(baseUrl)
+const url = new UrlBuilder(baseUrl)
   .addVariable('temperature')
   .addRange('temperature', 0, 10)
   .addSingleIndex('temperature', 5)
   .dodsUrl();
 
 // Multidimensional constraints
-const url2 = new JsUrlBuilder(baseUrl)
+const url2 = new UrlBuilder(baseUrl)
   .addVariable('temperature')
   .addMultidimensionalConstraint('temperature', [
     { start: 0, end: 10 },           // time

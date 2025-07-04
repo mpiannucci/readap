@@ -5,7 +5,7 @@
 extern crate wasm_bindgen_test;
 use wasm_bindgen_test::*;
 use wasm_bindgen::JsValue;
-use readap_wasm::{parse_dds, parse_das, JsUrlBuilder};
+use readap_wasm::{parse_dds, parse_das, UrlBuilder};
 use js_sys::{Array, Object, Reflect};
 
 wasm_bindgen_test_configure!(run_in_browser);
@@ -70,7 +70,7 @@ fn test_parse_das() {
 
 #[wasm_bindgen_test]
 fn test_url_builder() {
-    let builder = JsUrlBuilder::new("https://example.com/data.nc");
+    let builder = UrlBuilder::new("https://example.com/data.nc");
     
     // Test basic URL generation
     assert_eq!(builder.das_url(), "https://example.com/data.nc.das");
@@ -82,7 +82,7 @@ fn test_url_builder() {
 
 #[wasm_bindgen_test]
 fn test_url_builder_with_variables() {
-    let builder = JsUrlBuilder::new("https://example.com/data.nc")
+    let builder = UrlBuilder::new("https://example.com/data.nc")
         .add_variable("temp")
         .add_variable("time");
     
@@ -94,7 +94,7 @@ fn test_url_builder_with_variables() {
 
 #[wasm_bindgen_test]
 fn test_url_builder_with_array() {
-    let builder = JsUrlBuilder::new("https://example.com/data.nc");
+    let builder = UrlBuilder::new("https://example.com/data.nc");
     
     // Create JavaScript array of variables
     let vars = Array::new();
@@ -113,7 +113,7 @@ fn test_url_builder_with_array() {
 
 #[wasm_bindgen_test]
 fn test_url_builder_with_simple_constraints() {
-    let builder = JsUrlBuilder::new("https://example.com/data.nc")
+    let builder = UrlBuilder::new("https://example.com/data.nc")
         .add_variable("temp")
         .add_single_index("temp", 5);
     
@@ -123,7 +123,7 @@ fn test_url_builder_with_simple_constraints() {
 
 #[wasm_bindgen_test]
 fn test_url_builder_with_ranges() {
-    let builder = JsUrlBuilder::new("https://example.com/data.nc")
+    let builder = UrlBuilder::new("https://example.com/data.nc")
         .add_variable("temp")
         .add_range("temp", 0, 10, None);
     
@@ -133,7 +133,7 @@ fn test_url_builder_with_ranges() {
 
 #[wasm_bindgen_test]
 fn test_url_builder_with_stride() {
-    let builder = JsUrlBuilder::new("https://example.com/data.nc")
+    let builder = UrlBuilder::new("https://example.com/data.nc")
         .add_variable("temp")
         .add_range("temp", 0, 20, Some(2));
     
@@ -143,7 +143,7 @@ fn test_url_builder_with_stride() {
 
 #[wasm_bindgen_test]
 fn test_url_builder_multidimensional() {
-    let builder = JsUrlBuilder::new("https://example.com/data.nc")
+    let builder = UrlBuilder::new("https://example.com/data.nc")
         .add_variable("temp");
     
     // Create constraint array with mixed types
@@ -177,7 +177,7 @@ fn test_parse_error_handling() {
 
 #[wasm_bindgen_test]
 fn test_url_builder_clone() {
-    let builder1 = JsUrlBuilder::new("https://example.com/data.nc")
+    let builder1 = UrlBuilder::new("https://example.com/data.nc")
         .add_variable("temp");
     
     let builder2 = builder1.clone_builder();
@@ -190,7 +190,7 @@ fn test_url_builder_clone() {
 
 #[wasm_bindgen_test]
 fn test_url_builder_clear_operations() {
-    let builder = JsUrlBuilder::new("https://example.com/data.nc")
+    let builder = UrlBuilder::new("https://example.com/data.nc")
         .add_variable("temp")
         .add_variable("pressure")
         .add_range("temp", 0, 10, None);

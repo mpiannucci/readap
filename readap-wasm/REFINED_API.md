@@ -35,11 +35,11 @@ Parses DODS (Dataset Data Structure) binary content and returns:
 
 ### URL Builder
 
-#### `JsUrlBuilder`
+#### `UrlBuilder`
 JavaScript wrapper for the Rust UrlBuilder with fluent API:
 
 ```javascript
-const builder = new JsUrlBuilder("https://example.com/data.nc");
+const builder = new UrlBuilder("https://example.com/data.nc");
 
 // Basic URLs
 builder.dasUrl()  // "https://example.com/data.nc.das"
@@ -105,7 +105,7 @@ const wasm = await loadWasm();
 // Browser (with bundler)
 import * as wasm from 'readap-wasm';
 await wasm.default();
-const builder = new wasm.JsUrlBuilder("https://example.com/data");
+const builder = new wasm.UrlBuilder("https://example.com/data");
 ```
 
 ## Key Improvements
