@@ -28,13 +28,17 @@ fn test_parse_dds() {
     let name = Reflect::get(&result, &"name".into()).unwrap();
     assert_eq!(name.as_string().unwrap(), "example.nc");
     
-    // Check variables array exists
-    let vars = Reflect::get(&result, &"variables".into()).unwrap();
-    assert!(vars.is_object());
+    // Check values array exists
+    let values = Reflect::get(&result, &"values".into()).unwrap();
+    assert!(values.is_object());
     
-    // Check coordinate variables array exists  
-    let coords = Reflect::get(&result, &"coordinate_variables".into()).unwrap();
-    assert!(coords.is_object());
+    // Check variables list exists  
+    let variables = Reflect::get(&result, &"variables".into()).unwrap();
+    assert!(variables.is_object());
+    
+    // Check coordinates list exists
+    let coordinates = Reflect::get(&result, &"coordinates".into()).unwrap();
+    assert!(coordinates.is_object());
 }
 
 #[wasm_bindgen_test]
@@ -58,34 +62,39 @@ fn test_parse_das() {
     // Check that temp attributes exist
     let temp_attrs = Reflect::get(&result, &"temp".into()).unwrap();
     assert!(temp_attrs.is_object());
+    
+    // Check that time attributes exist
+    let time_attrs = Reflect::get(&result, &"time".into()).unwrap();
+    assert!(time_attrs.is_object());
 }
 
 #[wasm_bindgen_test]
 fn test_url_builder() {
-    let mut builder = JsUrlBuilder::new("https://example.com/data.nc").expect("Failed to create URL builder");
+    let builder = JsUrlBuilder::new("https://example.com/data.nc");
     
     // Test basic URL generation
     assert_eq!(builder.das_url(), "https://example.com/data.nc.das");
     assert_eq!(builder.dds_url(), "https://example.com/data.nc.dds");
-    assert_eq!(builder.dods_url(), "https://example.com/data.nc.dods");
     
-    // Test adding variables
-    builder.add_variable("temp").unwrap();
-    builder.add_variable("time").unwrap();
+    let dods_url = builder.dods_url().expect("Failed to generate DODS URL");
+    assert_eq!(dods_url, "https://example.com/data.nc.dods");
+}
+
+#[wasm_bindgen_test]
+fn test_url_builder_with_variables() {
+    let builder = JsUrlBuilder::new("https://example.com/data.nc")
+        .add_variable("temp")
+        .add_variable("time");
     
-    // Test adding constraints
-    builder.add_constraint("lat", "40.0").unwrap();
-    builder.add_range("time", 0, 10).unwrap();
-    
-    // Verify URLs contain query parameters
-    let dods_url = builder.dods_url();
+    let dods_url = builder.dods_url().expect("Failed to generate DODS URL");
     assert!(dods_url.contains("?"));
     assert!(dods_url.contains("temp"));
+    assert!(dods_url.contains("time"));
 }
 
 #[wasm_bindgen_test]
 fn test_url_builder_with_array() {
-    let mut builder = JsUrlBuilder::new("https://example.com/data.nc").expect("Failed to create URL builder");
+    let builder = JsUrlBuilder::new("https://example.com/data.nc");
     
     // Create JavaScript array of variables
     let vars = Array::new();
@@ -94,12 +103,65 @@ fn test_url_builder_with_array() {
     vars.push(&JsValue::from_str("humidity"));
     
     // Add multiple variables at once
-    builder.add_variables(&vars).unwrap();
+    let builder = builder.add_variables(&vars);
     
-    let dods_url = builder.dods_url();
+    let dods_url = builder.dods_url().expect("Failed to generate DODS URL");
     assert!(dods_url.contains("temp"));
     assert!(dods_url.contains("pressure"));
     assert!(dods_url.contains("humidity"));
+}
+
+#[wasm_bindgen_test]
+fn test_url_builder_with_simple_constraints() {
+    let builder = JsUrlBuilder::new("https://example.com/data.nc")
+        .add_variable("temp")
+        .add_single_index("temp", 5);
+    
+    let dods_url = builder.dods_url().expect("Failed to generate DODS URL");
+    assert!(dods_url.contains("temp[5]"));
+}
+
+#[wasm_bindgen_test]
+fn test_url_builder_with_ranges() {
+    let builder = JsUrlBuilder::new("https://example.com/data.nc")
+        .add_variable("temp")
+        .add_range("temp", 0, 10, None);
+    
+    let dods_url = builder.dods_url().expect("Failed to generate DODS URL");
+    assert!(dods_url.contains("temp[0:10]"));
+}
+
+#[wasm_bindgen_test]
+fn test_url_builder_with_stride() {
+    let builder = JsUrlBuilder::new("https://example.com/data.nc")
+        .add_variable("temp")
+        .add_range("temp", 0, 20, Some(2));
+    
+    let dods_url = builder.dods_url().expect("Failed to generate DODS URL");
+    assert!(dods_url.contains("temp[0:2:20]"));
+}
+
+#[wasm_bindgen_test]
+fn test_url_builder_multidimensional() {
+    let builder = JsUrlBuilder::new("https://example.com/data.nc")
+        .add_variable("temp");
+    
+    // Create constraint array with mixed types
+    let constraints = Array::new();
+    constraints.push(&JsValue::from_f64(5.0)); // Single index
+    
+    // Range object
+    let range_obj = Object::new();
+    Reflect::set(&range_obj, &"start".into(), &JsValue::from_f64(0.0)).unwrap();
+    Reflect::set(&range_obj, &"end".into(), &JsValue::from_f64(10.0)).unwrap();
+    constraints.push(&range_obj);
+    
+    let builder = builder.add_multidimensional_constraint("temp", &constraints)
+        .expect("Failed to add multidimensional constraint");
+    
+    let dods_url = builder.dods_url().expect("Failed to generate DODS URL");
+    assert!(dods_url.contains("temp"));
+    assert!(dods_url.contains("["));
 }
 
 #[wasm_bindgen_test]
@@ -115,11 +177,32 @@ fn test_parse_error_handling() {
 
 #[wasm_bindgen_test]
 fn test_url_builder_clone() {
-    let mut builder1 = JsUrlBuilder::new("https://example.com/data.nc").expect("Failed to create URL builder");
-    builder1.add_variable("temp").unwrap();
+    let builder1 = JsUrlBuilder::new("https://example.com/data.nc")
+        .add_variable("temp");
     
     let builder2 = builder1.clone_builder();
     
     // Both should produce the same URL
-    assert_eq!(builder1.dods_url(), builder2.dods_url());
+    let url1 = builder1.dods_url().unwrap();
+    let url2 = builder2.dods_url().unwrap();
+    assert_eq!(url1, url2);
+}
+
+#[wasm_bindgen_test]
+fn test_url_builder_clear_operations() {
+    let builder = JsUrlBuilder::new("https://example.com/data.nc")
+        .add_variable("temp")
+        .add_variable("pressure")
+        .add_range("temp", 0, 10, None);
+    
+    // Clear variables but keep constraints
+    let builder = builder.clear_variables();
+    let url = builder.dods_url().unwrap();
+    assert!(url.contains("temp[0:10]")); // Constraint should remain
+    assert!(!url.contains("pressure")); // Variable should be gone
+    
+    // Clear all
+    let builder = builder.clear_all();
+    let url = builder.dods_url().unwrap();
+    assert_eq!(url, "https://example.com/data.nc.dods");
 }
