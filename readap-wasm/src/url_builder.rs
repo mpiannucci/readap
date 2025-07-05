@@ -30,9 +30,7 @@ impl UrlBuilder {
     pub fn dods_url(&self) -> Result<String, JsValue> {
         match self.inner.dods_url() {
             Ok(url) => Ok(url),
-            Err(e) => Err(JsValue::from_str(&format!(
-                "Error building DODS URL: {e}"
-            ))),
+            Err(e) => Err(JsValue::from_str(&format!("Error building DODS URL: {e}"))),
         }
     }
 
