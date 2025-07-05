@@ -1,7 +1,10 @@
 mod url_builder;
 mod utils;
 
-use js_sys::{Array, Object, Reflect};
+use js_sys::{
+    Array, Float32Array, Float64Array, Int16Array, Int32Array, Int8Array, Object, Reflect,
+    Uint16Array, Uint32Array,
+};
 use readap::data::{DataType, DataValue};
 use readap::{parse_das_attributes, DasAttribute, DdsDataset, DodsDataset};
 use wasm_bindgen::prelude::*;
@@ -76,29 +79,169 @@ pub fn parse_das(content: &str) -> Result<JsValue, JsValue> {
 }
 
 #[wasm_bindgen]
-pub fn parse_dods(bytes: &[u8]) -> Result<JsValue, JsValue> {
+pub struct DodsData {
+    dataset: DodsDataset<'static>,
+    // Keep the bytes alive for zero-copy access
+    _bytes: Vec<u8>,
+}
+
+#[wasm_bindgen]
+impl DodsData {
+    #[wasm_bindgen(js_name = getVariables)]
+    pub fn get_variables(&self) -> Array {
+        let variables = Array::new();
+        for var_name in self.dataset.variables() {
+            variables.push(&JsValue::from_str(&var_name));
+        }
+        variables
+    }
+
+    #[wasm_bindgen(js_name = getVariableData)]
+    pub fn get_variable_data(&self, name: &str) -> Result<JsValue, JsValue> {
+        let data_array = self
+            .dataset
+            .variable_data(name)
+            .map_err(|e| JsValue::from_str(&format!("Failed to get variable data: {e}")))?;
+
+        create_typed_array_from_data_array(&data_array)
+    }
+
+    #[wasm_bindgen(js_name = getVariableInfo)]
+    pub fn get_variable_info(&self, name: &str) -> Result<JsValue, JsValue> {
+        let index = self
+            .dataset
+            .variable_index(name)
+            .ok_or_else(|| JsValue::from_str("Variable not found"))?;
+
+        let dds_value = &self.dataset.dds.values[index];
+        dds_value_to_js(dds_value)
+    }
+
+    #[wasm_bindgen(js_name = getDatasetInfo)]
+    pub fn get_dataset_info(&self) -> Result<JsValue, JsValue> {
+        let obj = Object::new();
+
+        Reflect::set(
+            &obj,
+            &"name".into(),
+            &JsValue::from_str(&self.dataset.dds.name),
+        )
+        .map_err(|_| JsValue::from_str("Failed to set name"))?;
+
+        let vars_array = Array::new();
+        for value in &self.dataset.dds.values {
+            let var_obj = dds_value_to_js(value)?;
+            vars_array.push(&var_obj);
+        }
+        Reflect::set(&obj, &"values".into(), &vars_array)
+            .map_err(|_| JsValue::from_str("Failed to set values"))?;
+
+        let variables = Array::new();
+        for var_name in self.dataset.dds.list_variables() {
+            variables.push(&JsValue::from_str(&var_name));
+        }
+        Reflect::set(&obj, &"variables".into(), &variables)
+            .map_err(|_| JsValue::from_str("Failed to set variables list"))?;
+
+        let coordinates = Array::new();
+        for coord_name in self.dataset.dds.list_coordinates() {
+            coordinates.push(&JsValue::from_str(&coord_name));
+        }
+        Reflect::set(&obj, &"coordinates".into(), &coordinates)
+            .map_err(|_| JsValue::from_str("Failed to set coordinates list"))?;
+
+        Ok(obj.into())
+    }
+}
+
+#[wasm_bindgen]
+pub fn parse_dods(bytes: &[u8]) -> Result<DodsData, JsValue> {
     utils::set_panic_hook();
 
-    match DodsDataset::from_bytes(bytes) {
-        Ok(dods) => {
-            let obj = Object::new();
+    // Copy bytes to owned Vec to ensure lifetime
+    let owned_bytes = bytes.to_vec();
 
-            // Set dataset
-            let dataset_obj = parse_dds(&format!("{:?}", dods.dds))?; // This is a placeholder - would need proper DDS serialization
-            Reflect::set(&obj, &"dataset".into(), &dataset_obj)
-                .map_err(|_| JsValue::from_str("Failed to set dataset"))?;
+    // SAFETY: We're extending the lifetime here, but we keep the owned_bytes
+    // alive in the DodsData struct, so this is safe
+    let bytes_ref: &'static [u8] =
+        unsafe { std::slice::from_raw_parts(owned_bytes.as_ptr(), owned_bytes.len()) };
 
-            // Set variables list
-            let variables = Array::new();
-            for var_name in dods.variables() {
-                variables.push(&JsValue::from_str(&var_name));
-            }
-            Reflect::set(&obj, &"variables".into(), &variables)
-                .map_err(|_| JsValue::from_str("Failed to set variables"))?;
-
-            Ok(obj.into())
-        }
+    match DodsDataset::from_bytes(bytes_ref) {
+        Ok(dataset) => Ok(DodsData {
+            dataset,
+            _bytes: owned_bytes,
+        }),
         Err(e) => Err(JsValue::from_str(&format!("Parse error: {e}"))),
+    }
+}
+
+fn create_typed_array_from_data_array(
+    data_array: &readap::data::DataArray,
+) -> Result<JsValue, JsValue> {
+    match data_array {
+        readap::data::DataArray::Byte(vec) => {
+            let array = Int8Array::new_with_length(vec.len() as u32);
+            for (i, &val) in vec.iter().enumerate() {
+                array.set_index(i as u32, val);
+            }
+            Ok(array.into())
+        }
+        readap::data::DataArray::Int16(vec) => {
+            let array = Int16Array::new_with_length(vec.len() as u32);
+            for (i, &val) in vec.iter().enumerate() {
+                array.set_index(i as u32, val);
+            }
+            Ok(array.into())
+        }
+        readap::data::DataArray::UInt16(vec) => {
+            let array = Uint16Array::new_with_length(vec.len() as u32);
+            for (i, &val) in vec.iter().enumerate() {
+                array.set_index(i as u32, val);
+            }
+            Ok(array.into())
+        }
+        readap::data::DataArray::Int32(vec) => {
+            let array = Int32Array::new_with_length(vec.len() as u32);
+            for (i, &val) in vec.iter().enumerate() {
+                array.set_index(i as u32, val);
+            }
+            Ok(array.into())
+        }
+        readap::data::DataArray::UInt32(vec) => {
+            let array = Uint32Array::new_with_length(vec.len() as u32);
+            for (i, &val) in vec.iter().enumerate() {
+                array.set_index(i as u32, val);
+            }
+            Ok(array.into())
+        }
+        readap::data::DataArray::Float32(vec) => {
+            let array = Float32Array::new_with_length(vec.len() as u32);
+            for (i, &val) in vec.iter().enumerate() {
+                array.set_index(i as u32, val);
+            }
+            Ok(array.into())
+        }
+        readap::data::DataArray::Float64(vec) => {
+            let array = Float64Array::new_with_length(vec.len() as u32);
+            for (i, &val) in vec.iter().enumerate() {
+                array.set_index(i as u32, val);
+            }
+            Ok(array.into())
+        }
+        readap::data::DataArray::String(vec) => {
+            let array = Array::new();
+            for s in vec {
+                array.push(&JsValue::from_str(s));
+            }
+            Ok(array.into())
+        }
+        readap::data::DataArray::URL(vec) => {
+            let array = Array::new();
+            for s in vec {
+                array.push(&JsValue::from_str(s));
+            }
+            Ok(array.into())
+        }
     }
 }
 
