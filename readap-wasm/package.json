@@ -7,8 +7,6 @@
   "types": "pkg/readap_wasm.d.ts",
   "scripts": {
     "build": "wasm-pack build --target web",
-    "build:node": "wasm-pack build --target nodejs",
-    "build:bundler": "wasm-pack build --target bundler",
     "test": "wasm-pack test --chrome --firefox",
     "test:node": "wasm-pack test --node"
   },
