@@ -4,25 +4,24 @@ async function test() {
     console.log('Testing readap-js high-level API...');
 
     try {
-        // Initialize the client
+        // Initialize the client (initialization is now automatic)
         const client = new DAPClient('https://example.com/data');
-        await client.init();
 
-        console.log('✓ Client initialized successfully');
+        console.log('✓ Client created successfully');
 
-        // Test URL generation
-        console.log('DAS URL:', client.getDasUrl());
-        console.log('DDS URL:', client.getDdsUrl());
-        console.log('DODS URL:', client.getDodsUrl());
+        // Test URL generation (these now handle initialization automatically)
+        console.log('DAS URL:', await client.getDasUrl());
+        console.log('DDS URL:', await client.getDdsUrl());
+        console.log('DODS URL:', await client.getDodsUrl());
 
         // Test with simple constraints first
         console.log('Testing simple variable selection...');
-        const simpleUrl = client.getDodsUrl(['mean_wave_dir']);
+        const simpleUrl = await client.getDodsUrl(['mean_wave_dir']);
         console.log('Simple variable URL:', simpleUrl);
         
         // Test with constraints
         console.log('Testing with constraints...');
-        const constrainedUrl = client.getDodsUrl(['mean_wave_dir'], { 
+        const constrainedUrl = await client.getDodsUrl(['mean_wave_dir'], { 
             mean_wave_dir: [{ start: 0, end: 5, stride: 2 }] 
         });
         console.log('Constrained URL:', constrainedUrl);
@@ -53,12 +52,12 @@ async function test() {
 }`;
 
         console.log('\n=== Testing DDS Parsing ===');
-        const dataset = client.parseDds(ddsContent);
+        const dataset = await client.parseDds(ddsContent);
         console.log('Dataset:', dataset.name);
         console.log('Variables:', dataset.variables);
 
         console.log('\n=== Testing DAS Parsing ===');
-        const attributes = client.parseDas(dasContent);
+        const attributes = await client.parseDas(dasContent);
         console.log('Attributes:', Object.keys(attributes));
 
         console.log('\n✓ All readap-js tests passed!');

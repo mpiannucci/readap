@@ -12,10 +12,11 @@
     }
   },
   "scripts": {
-    "build": "tsc",
+    "build": "npm run clean && tsc && npm run copy-wasm",
+    "copy-wasm": "mkdir -p dist/wasm && cp ../readap-wasm/pkg/readap_wasm_bg.wasm dist/wasm/ && cp ../readap-wasm/pkg/readap_wasm.js dist/wasm/ && cp ../readap-wasm/pkg/readap_wasm_bg.js dist/wasm/ && cp ../readap-wasm/pkg/readap_wasm.d.ts dist/wasm/",
     "dev": "tsc --watch",
     "clean": "rm -rf dist",
-    "test": "node --test dist/test/*.js",
+    "test": "npm run build && node --test dist/test/*.js",
     "prepublishOnly": "npm run build"
   },
   "files": [

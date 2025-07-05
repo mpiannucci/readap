@@ -24,7 +24,7 @@ export class DAPClient {
   private urlBuilder?: UrlBuilder;
   private ddsCache?: DdsDataset;
   private dasCache?: DasAttributes;
-  private initialized = false;
+  private initPromise?: Promise<void>;
 
   constructor(baseUrl: string, options: DAPClientOptions = {}) {
     this.baseUrl = baseUrl.replace(/\/$/, ''); // Remove trailing slash
@@ -32,20 +32,20 @@ export class DAPClient {
       timeout: 30000,
       ...options
     };
+    // Start initialization automatically
+    this.initPromise = this.init();
   }
 
-  async init(): Promise<void> {
-    if (this.initialized) return;
-    
+  private async init(): Promise<void> {
     // In Node.js, we need to load the WASM file manually
     if (typeof window === 'undefined') {
       const fs = await import('fs');
       const path = await import('path');
       const { fileURLToPath } = await import('url');
       
-      // Find the WASM file relative to this module
+      // Find the WASM file in our dist directory
       const currentDir = path.dirname(fileURLToPath(import.meta.url));
-      const wasmPath = path.resolve(currentDir, '../../readap-wasm/pkg/readap_wasm_bg.wasm');
+      const wasmPath = path.resolve(currentDir, 'wasm/readap_wasm_bg.wasm');
       
       if (fs.existsSync(wasmPath)) {
         const wasmBytes = fs.readFileSync(wasmPath);
@@ -60,17 +60,19 @@ export class DAPClient {
     }
     
     this.urlBuilder = new UrlBuilder(this.baseUrl);
-    this.initialized = true;
   }
 
-  private ensureInitialized(): void {
-    if (!this.initialized || !this.urlBuilder) {
-      throw new Error('DAPClient not initialized. Call init() first.');
+  private async ensureInitialized(): Promise<void> {
+    if (this.initPromise) {
+      await this.initPromise;
+    }
+    if (!this.urlBuilder) {
+      throw new Error('DAPClient initialization failed.');
     }
   }
 
   async getDatasetInfo(): Promise<DatasetInfo> {
-    this.ensureInitialized();
+    await this.ensureInitialized();
     const [dds, das] = await Promise.all([
       this.getDDS(),
       this.getDAS()
@@ -100,7 +102,7 @@ export class DAPClient {
   }
 
   async fetchData(variableName: string, options: FetchDataOptions = {}): Promise<VariableData> {
-    this.ensureInitialized();
+    await this.ensureInitialized();
     const dds = await this.getDDS();
     
     // Verify variable exists
@@ -245,18 +247,18 @@ export class DAPClient {
   }
 
   // Convenience methods for URL generation
-  getDasUrl(): string {
-    this.ensureInitialized();
+  async getDasUrl(): Promise<string> {
+    await this.ensureInitialized();
     return this.urlBuilder!.dasUrl();
   }
 
-  getDdsUrl(): string {
-    this.ensureInitialized();
+  async getDdsUrl(): Promise<string> {
+    await this.ensureInitialized();
     return this.urlBuilder!.ddsUrl();
   }
 
-  getDodsUrl(variables?: string[], constraints?: Record<string, any>): string {
-    this.ensureInitialized();
+  async getDodsUrl(variables?: string[], constraints?: Record<string, any>): Promise<string> {
+    await this.ensureInitialized();
     
     // Create a temporary builder to avoid affecting the main one
     let tempBuilder = new UrlBuilder(this.baseUrl);
@@ -287,13 +289,13 @@ export class DAPClient {
   }
 
   // Convenience methods for parsing without network calls
-  parseDds(ddsContent: string): DdsDataset {
-    this.ensureInitialized();
+  async parseDds(ddsContent: string): Promise<DdsDataset> {
+    await this.ensureInitialized();
     return parse_dds(ddsContent) as DdsDataset;
   }
 
-  parseDas(dasContent: string): DasAttributes {
-    this.ensureInitialized();
+  async parseDas(dasContent: string): Promise<DasAttributes> {
+    await this.ensureInitialized();
     return parse_das(dasContent) as DasAttributes;
   }
 }

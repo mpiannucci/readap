@@ -4,8 +4,7 @@ async function example() {
   // Create a client for an OpenDAP dataset
   const client = new DAPClient('https://example.com/opendap/data-source');
 
-  // Initialize the WASM module
-  await client.init();
+  // WASM module initializes automatically
 
   try {
     // Get dataset information with strongly typed response
