@@ -43,6 +43,32 @@ jobs:
     - name: Run tests
       run: cargo test --verbose
 
+  wasm-test:
+    name: WASM Test
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: wasm32-unknown-unknown
+    - name: Install wasm-pack
+      run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+    - name: Cache cargo registry
+      uses: actions/cache@v3
+      with:
+        path: ~/.cargo/registry
+        key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+    - name: Cache cargo index
+      uses: actions/cache@v3
+      with:
+        path: ~/.cargo/git
+        key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+    - name: Build WASM package
+      run: cd readap-wasm && wasm-pack build --target web
+    - name: Test WASM package
+      run: cd readap-wasm && wasm-pack test --headless --firefox
+
   clippy:
     name: Clippy
     runs-on: ubuntu-latest

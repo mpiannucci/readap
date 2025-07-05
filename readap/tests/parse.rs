@@ -21,7 +21,7 @@ fn read_das() {
 fn read_dds() {
     let input = &fs::read_to_string("./data/44008.ncml.dds").unwrap();
 
-    let dataset = DdsDataset::from_bytes(&input).unwrap();
+    let dataset = DdsDataset::from_bytes(input).unwrap();
     assert_eq!(dataset.values.len(), 16);
     assert_eq!(dataset.name, "data/stdmet/44008/44008.ncml");
 }
@@ -30,7 +30,7 @@ fn read_dds() {
 fn read_dataset() {
     let input = &fs::read("./data/swden/44097w9999.nc.dods").unwrap();
 
-    let dataset = DodsDataset::from_bytes(&input).unwrap();
+    let dataset = DodsDataset::from_bytes(input).unwrap();
 
     // Once the dataset is parsed, data arrays can be extracted as DataArrays that encode the type in an enum.
     let mwd = if let DataArray::Int32(mwd) = dataset.variable_data("mean_wave_dir").unwrap() {

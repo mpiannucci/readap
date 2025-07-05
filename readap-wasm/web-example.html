@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>readap-wasm Web Example</title>
+    <style>
+        body { font-family: monospace; padding: 20px; }
+        .output { background: #f5f5f5; padding: 10px; margin: 10px 0; white-space: pre-wrap; }
+        .error { background: #ffe6e6; color: #cc0000; }
+        .success { background: #e6ffe6; color: #006600; }
+    </style>
+</head>
+<body>
+    <h1>readap-wasm Web Runtime Test</h1>
+    <div id="output"></div>
+
+    <script type="module">
+        import init, {
+            parse_dds,
+            parse_das,
+            parse_dods,
+            UrlBuilder,
+        } from './pkg/readap_wasm.js';
+
+        const output = document.getElementById('output');
+
+        function log(message, type = 'normal') {
+            const div = document.createElement('div');
+            div.className = `output ${type}`;
+            div.textContent = message;
+            output.appendChild(div);
+        }
+
+        // Example DDS content
+        const ddsContent = `Dataset {
+    Float32 latitude[latitude = 5];
+    Float32 longitude[longitude = 10];
+    Int32 time[time = 100];
+    Grid {
+     ARRAY:
+        Float32 temperature[time = 100][latitude = 5][longitude = 10];
+     MAPS:
+        Int32 time[time = 100];
+        Float32 latitude[latitude = 5];
+        Float32 longitude[longitude = 10];
+    } temperature;
+} test_dataset;`;
+
+        // Example DAS content
+        const dasContent = `Attributes {
+    time {
+        String long_name "Epoch Time";
+        String units "seconds since 1970-01-01 00:00:00 UTC";
+    }
+    temperature {
+        String long_name "Sea Surface Temperature";
+        String units "degrees_C";
+        Float32 _FillValue -999.0;
+    }
+}`;
+
+        async function run() {
+            try {
+                log('Loading readap-wasm...', 'normal');
+                await init();
+                log('✓ readap-wasm loaded successfully!', 'success');
+
+                log('\n=== Parsing DDS ===', 'normal');
+                const dataset = parse_dds(ddsContent);
+                log(`Dataset name: ${dataset.name}`, 'normal');
+                log(`Variables: ${JSON.stringify(dataset.variables)}`, 'normal');
+                log(`Coordinates: ${JSON.stringify(dataset.coordinates)}`, 'normal');
+                log(`DDS Values: ${dataset.values.length}`, 'normal');
+
+                log('\n=== Parsing DAS ===', 'normal');
+                const attributes = parse_das(dasContent);
+                log(`Attributes: ${JSON.stringify(Object.keys(attributes))}`, 'normal');
+                if (attributes.time) {
+                    log(`Time attributes: ${JSON.stringify(attributes.time)}`, 'normal');
+                }
+
+                log('\n=== URL Builder ===', 'normal');
+                const baseUrl = 'https://example.com/data/ocean';
+                
+                // Basic URL generation
+                let builder = new UrlBuilder(baseUrl);
+                log(`DAS URL: ${builder.dasUrl()}`, 'normal');
+                log(`DDS URL: ${builder.ddsUrl()}`, 'normal');
+                log(`Basic DODS URL: ${builder.dodsUrl()}`, 'normal');
+
+                // Variable selection
+                builder = new UrlBuilder(baseUrl).addVariable('temperature');
+                log(`With variable: ${builder.dodsUrl()}`, 'normal');
+
+                // Range constraint
+                builder = new UrlBuilder(baseUrl)
+                    .addVariable('temperature')
+                    .addRange('temperature', 0, 10, null);
+                log(`With range: ${builder.dodsUrl()}`, 'normal');
+
+                // Range with stride
+                builder = new UrlBuilder(baseUrl)
+                    .addVariable('temperature')
+                    .addRange('temperature', 0, 20, 2);
+                log(`With stride: ${builder.dodsUrl()}`, 'normal');
+
+                log('\n=== Zero-Copy Data Access Demo ===', 'normal');
+                log('Note: parse_dods() would be used with actual binary DODS data', 'normal');
+                log('Example usage:', 'normal');
+                log('  const dodsData = parse_dods(binaryBytes);', 'normal');
+                log('  const variables = dodsData.getVariables();', 'normal');
+                log('  const tempData = dodsData.getVariableData("temperature"); // Float32Array', 'normal');
+                log('  const timeData = dodsData.getVariableData("time"); // Int32Array', 'normal');
+
+                log('\n✓ All tests completed successfully!', 'success');
+
+            } catch (error) {
+                log(`✗ Error: ${error.message}`, 'error');
+                console.error('Full error:', error);
+            }
+        }
+
+        run();
+    </script>
+</body>
+</html>

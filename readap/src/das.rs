@@ -325,7 +325,7 @@ mod tests {
         assert_eq!(attr.data_type, DataType::Float64);
         assert_eq!(attr.name, "precision_value");
         if let DataValue::Float64(val) = attr.value {
-            assert!((val - 3.141592653589793).abs() < 1e-15);
+            assert!((val - std::f64::consts::PI).abs() < 1e-15);
         } else {
             panic!("Expected Float64 value");
         }
