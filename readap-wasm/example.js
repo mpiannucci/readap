@@ -1,15 +1,10 @@
-// Example usage of readap-wasm
-// This shows how to use the updated WASM bindings with the correct API
-
-import { 
-  parse_dds, 
-  parse_das, 
+import init, {
+  parse_dds,
+  parse_das,
   parse_dods,
   UrlBuilder,
-  create_query_builder,
-  get_variable_info,
-  get_coordinate_info
 } from './pkg/readap_wasm.js';
+import { readFileSync } from 'fs';
 
 // Example DDS content
 const ddsContent = `Dataset {
@@ -24,36 +19,30 @@ const ddsContent = `Dataset {
         Float32 latitude[latitude = 5];
         Float32 longitude[longitude = 10];
     } temperature;
-    Grid {
-     ARRAY:
-        Float32 wind_speed[time = 100][latitude = 5][longitude = 10];
-     MAPS:
-        Int32 time[time = 100];
-        Float32 latitude[latitude = 5];
-        Float32 longitude[longitude = 10];
-    } wind_speed;
 } test_dataset;`;
 
 // Example DAS content
 const dasContent = `Attributes {
     time {
         String long_name "Epoch Time";
-        String short_name "time";
-        String standard_name "time";
         String units "seconds since 1970-01-01 00:00:00 UTC";
     }
     temperature {
         String long_name "Sea Surface Temperature";
-        String short_name "sst";
-        String standard_name "sea_surface_temperature";
         String units "degrees_C";
         Float32 _FillValue -999.0;
     }
 }`;
 
-async function example() {
+async function run() {
+  // Load WASM file for Node.js
+  const wasmBytes = readFileSync('./pkg/readap_wasm_bg.wasm');
+  await init(wasmBytes);
+
+  console.log('readap-wasm loaded successfully');
+  
   try {
-    console.log('=== Parsing DDS ===');
+    console.log('\n=== Parsing DDS ===');
     const dataset = parse_dds(ddsContent);
     console.log('Dataset name:', dataset.name);
     console.log('Variables:', dataset.variables);
@@ -63,15 +52,9 @@ async function example() {
     console.log('\n=== Parsing DAS ===');
     const attributes = parse_das(dasContent);
     console.log('Attributes:', Object.keys(attributes));
-    console.log('Time attributes:', attributes.time);
-
-    console.log('\n=== Variable Information ===');
-    const tempInfo = get_variable_info(ddsContent, 'temperature');
-    console.log('Temperature variable info:', tempInfo);
-
-    console.log('\n=== Coordinate Information ===');
-    const timeInfo = get_coordinate_info(ddsContent, 'time');
-    console.log('Time coordinate info:', timeInfo);
+    if (attributes.time) {
+      console.log('Time attributes:', attributes.time);
+    }
 
     console.log('\n=== URL Builder ===');
     const baseUrl = 'https://example.com/data/ocean';
@@ -84,46 +67,32 @@ async function example() {
 
     // Variable selection
     builder = new UrlBuilder(baseUrl)
-      .addVariable('temperature')
-      .addVariable('wind_speed');
-    console.log('With variables:', builder.dodsUrl());
-
-    // Single index constraint
-    builder = new UrlBuilder(baseUrl)
-      .addVariable('temperature')
-      .addSingleIndex('temperature', 5);
-    console.log('With single index:', builder.dodsUrl());
+      .addVariable('temperature');
+    console.log('With variable:', builder.dodsUrl());
 
     // Range constraint
     builder = new UrlBuilder(baseUrl)
       .addVariable('temperature')
-      .addRange('temperature', 0, 10);
+      .addRange('temperature', 0, 10, null);
     console.log('With range:', builder.dodsUrl());
 
     // Range with stride
     builder = new UrlBuilder(baseUrl)
       .addVariable('temperature')
-      .addRangeWithStride('temperature', 0, 20, 2);
+      .addRange('temperature', 0, 20, 2);
     console.log('With stride:', builder.dodsUrl());
 
-    // Multidimensional constraint
-    builder = new UrlBuilder(baseUrl)
-      .addVariable('temperature')
-      .addMultidimensionalConstraint('temperature', [
-        { start: 0, end: 10 },      // time dimension
-        5,                          // latitude dimension (single index)
-        { start: 0, end: 8, stride: 2 }  // longitude dimension with stride
-      ]);
-    console.log('Multidimensional:', builder.dodsUrl());
-
-    console.log('\n=== Query Builder ===');
-    const queryBuilder = create_query_builder(ddsContent, baseUrl);
-    console.log('Query builder:', queryBuilder);
+    console.log('\n=== Zero-Copy Data Access Demo ===');
+    console.log('Note: parse_dods() would be used with actual binary DODS data');
+    console.log('Example usage:');
+    console.log('  const dodsData = parse_dods(binaryBytes);');
+    console.log('  const variables = dodsData.getVariables();');
+    console.log('  const tempData = dodsData.getVariableData("temperature"); // Float32Array');
+    console.log('  const timeData = dodsData.getVariableData("time"); // Int32Array');
 
   } catch (error) {
     console.error('Error:', error);
   }
 }
 
-// Run the example
-example();
+run();
