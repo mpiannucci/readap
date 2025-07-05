@@ -2,14 +2,53 @@ mod url_builder;
 mod utils;
 
 use js_sys::{
-    Array, Float32Array, Float64Array, Int16Array, Int32Array, Int8Array, Object, Reflect,
-    Uint16Array, Uint32Array,
+    Array, Float32Array, Float64Array, Int16Array, Int32Array, Int8Array, Uint16Array, Uint32Array,
 };
 use readap::data::{DataType, DataValue};
-use readap::{parse_das_attributes, DasAttribute, DdsDataset, DodsDataset};
+use readap::{parse_das_attributes, DdsDataset, DodsDataset};
+use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
 pub use url_builder::UrlBuilder;
+
+// TypeScript-friendly data structures using serde
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Dimension {
+    pub name: String,
+    pub size: u32,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DdsValueInfo {
+    pub name: String,
+    #[serde(rename = "type")]
+    pub value_type: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data_type: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub coordinates: Option<Vec<Dimension>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fields: Option<Vec<DdsValueInfo>>,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DdsDatasetInfo {
+    pub name: String,
+    pub values: Vec<DdsValueInfo>,
+    pub variables: Vec<String>,
+    pub coordinates: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DasAttributeInfo {
+    pub name: String,
+    pub data_type: String,
+    pub value: String,
+}
 
 #[wasm_bindgen]
 pub fn parse_dds(content: &str) -> Result<JsValue, JsValue> {
@@ -17,37 +56,23 @@ pub fn parse_dds(content: &str) -> Result<JsValue, JsValue> {
 
     match DdsDataset::from_bytes(content) {
         Ok(dataset) => {
-            let obj = Object::new();
+            let mut values = Vec::new();
 
-            // Set dataset name
-            Reflect::set(&obj, &"name".into(), &JsValue::from_str(&dataset.name))
-                .map_err(|_| JsValue::from_str("Failed to set name"))?;
-
-            // Convert variables
-            let vars_array = Array::new();
+            // Convert DDS values to our serializable structs
             for value in &dataset.values {
-                let var_obj = dds_value_to_js(value)?;
-                vars_array.push(&var_obj);
+                let dds_value = convert_dds_value_to_info(value)?;
+                values.push(dds_value);
             }
-            Reflect::set(&obj, &"values".into(), &vars_array)
-                .map_err(|_| JsValue::from_str("Failed to set values"))?;
 
-            // Add utility methods as properties
-            let variables = Array::new();
-            for var_name in dataset.list_variables() {
-                variables.push(&JsValue::from_str(&var_name));
-            }
-            Reflect::set(&obj, &"variables".into(), &variables)
-                .map_err(|_| JsValue::from_str("Failed to set variables list"))?;
+            let result = DdsDatasetInfo {
+                name: dataset.name.clone(),
+                values,
+                variables: dataset.list_variables(),
+                coordinates: dataset.list_coordinates(),
+            };
 
-            let coordinates = Array::new();
-            for coord_name in dataset.list_coordinates() {
-                coordinates.push(&JsValue::from_str(&coord_name));
-            }
-            Reflect::set(&obj, &"coordinates".into(), &coordinates)
-                .map_err(|_| JsValue::from_str("Failed to set coordinates list"))?;
-
-            Ok(obj.into())
+            serde_wasm_bindgen::to_value(&result)
+                .map_err(|e| JsValue::from_str(&format!("Serialization error: {e}")))
         }
         Err(e) => Err(JsValue::from_str(&format!("Parse error: {e}"))),
     }
@@ -59,20 +84,30 @@ pub fn parse_das(content: &str) -> Result<JsValue, JsValue> {
 
     match parse_das_attributes(content) {
         Ok(attributes) => {
-            let obj = Object::new();
+            // Use a plain JavaScript object instead of HashMap
+            let js_obj = js_sys::Object::new();
 
             for (var_name, var_attrs) in attributes {
-                let var_obj = Object::new();
+                let var_obj = js_sys::Object::new();
                 for (attr_name, attr) in var_attrs {
-                    let attr_obj = das_attribute_to_js(&attr)?;
-                    Reflect::set(&var_obj, &JsValue::from_str(&attr_name), &attr_obj)
-                        .map_err(|_| JsValue::from_str("Failed to set attribute"))?;
+                    let attr_info = DasAttributeInfo {
+                        name: attr.name.clone(),
+                        data_type: data_type_to_string(&attr.data_type),
+                        value: data_value_to_string(&attr.value),
+                    };
+                    let attr_js = serde_wasm_bindgen::to_value(&attr_info).map_err(|e| {
+                        JsValue::from_str(&format!("Attribute serialization error: {e}"))
+                    })?;
+                    js_sys::Reflect::set(&var_obj, &JsValue::from_str(&attr_name), &attr_js)
+                        .map_err(|e| {
+                            JsValue::from_str(&format!("Failed to set attribute: {e:?}"))
+                        })?;
                 }
-                Reflect::set(&obj, &JsValue::from_str(&var_name), &var_obj)
-                    .map_err(|_| JsValue::from_str("Failed to set variable"))?;
+                js_sys::Reflect::set(&js_obj, &JsValue::from_str(&var_name), &var_obj.into())
+                    .map_err(|e| JsValue::from_str(&format!("Failed to set variable: {e:?}")))?;
             }
 
-            Ok(obj.into())
+            Ok(js_obj.into())
         }
         Err(e) => Err(JsValue::from_str(&format!("Parse error: {e}"))),
     }
@@ -114,43 +149,28 @@ impl DodsData {
             .ok_or_else(|| JsValue::from_str("Variable not found"))?;
 
         let dds_value = &self.dataset.dds.values[index];
-        dds_value_to_js(dds_value)
+        let value_info = convert_dds_value_to_info(dds_value)?;
+        serde_wasm_bindgen::to_value(&value_info)
+            .map_err(|e| JsValue::from_str(&format!("Serialization error: {e}")))
     }
 
     #[wasm_bindgen(js_name = getDatasetInfo)]
     pub fn get_dataset_info(&self) -> Result<JsValue, JsValue> {
-        let obj = Object::new();
-
-        Reflect::set(
-            &obj,
-            &"name".into(),
-            &JsValue::from_str(&self.dataset.dds.name),
-        )
-        .map_err(|_| JsValue::from_str("Failed to set name"))?;
-
-        let vars_array = Array::new();
+        let mut values = Vec::new();
         for value in &self.dataset.dds.values {
-            let var_obj = dds_value_to_js(value)?;
-            vars_array.push(&var_obj);
+            let value_info = convert_dds_value_to_info(value)?;
+            values.push(value_info);
         }
-        Reflect::set(&obj, &"values".into(), &vars_array)
-            .map_err(|_| JsValue::from_str("Failed to set values"))?;
 
-        let variables = Array::new();
-        for var_name in self.dataset.dds.list_variables() {
-            variables.push(&JsValue::from_str(&var_name));
-        }
-        Reflect::set(&obj, &"variables".into(), &variables)
-            .map_err(|_| JsValue::from_str("Failed to set variables list"))?;
+        let dataset_info = DdsDatasetInfo {
+            name: self.dataset.dds.name.clone(),
+            values,
+            variables: self.dataset.dds.list_variables(),
+            coordinates: self.dataset.dds.list_coordinates(),
+        };
 
-        let coordinates = Array::new();
-        for coord_name in self.dataset.dds.list_coordinates() {
-            coordinates.push(&JsValue::from_str(&coord_name));
-        }
-        Reflect::set(&obj, &"coordinates".into(), &coordinates)
-            .map_err(|_| JsValue::from_str("Failed to set coordinates list"))?;
-
-        Ok(obj.into())
+        serde_wasm_bindgen::to_value(&dataset_info)
+            .map_err(|e| JsValue::from_str(&format!("Serialization error: {e}")))
     }
 }
 
@@ -246,130 +266,94 @@ fn create_typed_array_from_data_array(
 }
 
 // Helper functions
-fn dds_value_to_js(value: &readap::DdsValue) -> Result<JsValue, JsValue> {
-    let obj = Object::new();
+fn convert_dds_value_to_info(value: &readap::DdsValue) -> Result<DdsValueInfo, JsValue> {
+    let name = value.name();
+    let value_type = match value {
+        readap::DdsValue::Array(_) => "Array",
+        readap::DdsValue::Grid(_) => "Grid",
+        readap::DdsValue::Structure(_) => "Structure",
+        readap::DdsValue::Sequence(_) => "Sequence",
+    }
+    .to_string();
 
-    Reflect::set(&obj, &"name".into(), &JsValue::from_str(&value.name()))
-        .map_err(|_| JsValue::from_str("Failed to set value name"))?;
+    let data_type = match value {
+        readap::DdsValue::Array(array) => Some(data_type_to_string(&array.data_type)),
+        readap::DdsValue::Grid(grid) => Some(data_type_to_string(&grid.array.data_type)),
+        _ => None,
+    };
 
-    match value {
+    // Add coordinates if available
+    let coordinates = match value {
         readap::DdsValue::Array(array) => {
-            Reflect::set(&obj, &"type".into(), &JsValue::from_str("Array"))
-                .map_err(|_| JsValue::from_str("Failed to set type"))?;
-
-            Reflect::set(
-                &obj,
-                &"dataType".into(),
-                &JsValue::from_str(&data_type_to_string(&array.data_type)),
-            )
-            .map_err(|_| JsValue::from_str("Failed to set data type"))?;
-
-            let coords_array = Array::new();
-            for (coord_name, coord_size) in &array.coords {
-                let coord_obj = Object::new();
-                Reflect::set(&coord_obj, &"name".into(), &JsValue::from_str(coord_name))
-                    .map_err(|_| JsValue::from_str("Failed to set coord name"))?;
-                Reflect::set(
-                    &coord_obj,
-                    &"size".into(),
-                    &JsValue::from_f64(*coord_size as f64),
+            if !array.coords.is_empty() {
+                Some(
+                    array
+                        .coords
+                        .iter()
+                        .map(|(name, size)| Dimension {
+                            name: name.clone(),
+                            size: *size,
+                        })
+                        .collect(),
                 )
-                .map_err(|_| JsValue::from_str("Failed to set coord size"))?;
-                coords_array.push(&coord_obj);
+            } else {
+                None
             }
-            Reflect::set(&obj, &"coordinates".into(), &coords_array)
-                .map_err(|_| JsValue::from_str("Failed to set coordinates"))?;
         }
         readap::DdsValue::Grid(grid) => {
-            Reflect::set(&obj, &"type".into(), &JsValue::from_str("Grid"))
-                .map_err(|_| JsValue::from_str("Failed to set type"))?;
-
-            Reflect::set(
-                &obj,
-                &"dataType".into(),
-                &JsValue::from_str(&data_type_to_string(&grid.array.data_type)),
-            )
-            .map_err(|_| JsValue::from_str("Failed to set data type"))?;
-
-            let coords_array = Array::new();
-            for coord in &grid.coords {
-                let coord_obj = Object::new();
-                Reflect::set(&coord_obj, &"name".into(), &JsValue::from_str(&coord.name))
-                    .map_err(|_| JsValue::from_str("Failed to set coord name"))?;
-                Reflect::set(
-                    &coord_obj,
-                    &"size".into(),
-                    &JsValue::from_f64(coord.array_length() as f64),
+            if !grid.coords.is_empty() {
+                Some(
+                    grid.coords
+                        .iter()
+                        .map(|coord| Dimension {
+                            name: coord.name.clone(),
+                            size: coord.array_length(),
+                        })
+                        .collect(),
                 )
-                .map_err(|_| JsValue::from_str("Failed to set coord size"))?;
-                coords_array.push(&coord_obj);
+            } else {
+                None
             }
-            Reflect::set(&obj, &"coordinates".into(), &coords_array)
-                .map_err(|_| JsValue::from_str("Failed to set coordinates"))?;
         }
         readap::DdsValue::Structure(structure) => {
-            Reflect::set(&obj, &"type".into(), &JsValue::from_str("Structure"))
-                .map_err(|_| JsValue::from_str("Failed to set type"))?;
-
-            let fields_array = Array::new();
-            for field in &structure.fields {
-                let field_obj = dds_value_to_js(field)?;
-                fields_array.push(&field_obj);
-            }
-            Reflect::set(&obj, &"fields".into(), &fields_array)
-                .map_err(|_| JsValue::from_str("Failed to set fields"))?;
+            // For structures, we need to handle nested fields
+            let fields: Result<Vec<DdsValueInfo>, JsValue> = structure
+                .fields
+                .iter()
+                .map(convert_dds_value_to_info)
+                .collect();
+            return Ok(DdsValueInfo {
+                name,
+                value_type,
+                data_type,
+                coordinates: None,
+                fields: Some(fields?),
+            });
         }
         readap::DdsValue::Sequence(sequence) => {
-            Reflect::set(&obj, &"type".into(), &JsValue::from_str("Sequence"))
-                .map_err(|_| JsValue::from_str("Failed to set type"))?;
-
-            let fields_array = Array::new();
-            for field in &sequence.fields {
-                let field_obj = dds_value_to_js(field)?;
-                fields_array.push(&field_obj);
-            }
-            Reflect::set(&obj, &"fields".into(), &fields_array)
-                .map_err(|_| JsValue::from_str("Failed to set fields"))?;
+            // For sequences, we need to handle nested fields
+            let fields: Result<Vec<DdsValueInfo>, JsValue> = sequence
+                .fields
+                .iter()
+                .map(convert_dds_value_to_info)
+                .collect();
+            return Ok(DdsValueInfo {
+                name,
+                value_type,
+                data_type,
+                coordinates: None,
+                fields: Some(fields?),
+            });
         }
-    }
-
-    Ok(obj.into())
-}
-
-fn das_attribute_to_js(attr: &DasAttribute) -> Result<JsValue, JsValue> {
-    let obj = Object::new();
-
-    Reflect::set(&obj, &"name".into(), &JsValue::from_str(&attr.name))
-        .map_err(|_| JsValue::from_str("Failed to set attribute name"))?;
-
-    Reflect::set(
-        &obj,
-        &"dataType".into(),
-        &JsValue::from_str(&data_type_to_string(&attr.data_type)),
-    )
-    .map_err(|_| JsValue::from_str("Failed to set attribute data type"))?;
-
-    // Set the actual value
-    let value = data_value_to_js(&attr.value)?;
-    Reflect::set(&obj, &"value".into(), &value)
-        .map_err(|_| JsValue::from_str("Failed to set attribute value"))?;
-
-    Ok(obj.into())
-}
-
-fn data_value_to_js(value: &DataValue) -> Result<JsValue, JsValue> {
-    let js_value = match value {
-        DataValue::Byte(v) => JsValue::from_f64(*v as f64),
-        DataValue::Int16(v) => JsValue::from_f64(*v as f64),
-        DataValue::UInt16(v) => JsValue::from_f64(*v as f64),
-        DataValue::Int32(v) => JsValue::from_f64(*v as f64),
-        DataValue::UInt32(v) => JsValue::from_f64(*v as f64),
-        DataValue::Float32(v) => JsValue::from_f64(*v as f64),
-        DataValue::Float64(v) => JsValue::from_f64(*v),
-        DataValue::String(v) => JsValue::from_str(v),
-        DataValue::URL(v) => JsValue::from_str(v),
     };
-    Ok(js_value)
+
+    Ok(DdsValueInfo {
+        name,
+        value_type,
+        data_type,
+        coordinates,
+        fields: None,
+    })
 }
 
 fn data_type_to_string(data_type: &DataType) -> String {
@@ -383,5 +367,19 @@ fn data_type_to_string(data_type: &DataType) -> String {
         DataType::Float64 => "Float64".to_string(),
         DataType::String => "String".to_string(),
         DataType::URL => "URL".to_string(),
+    }
+}
+
+fn data_value_to_string(value: &DataValue) -> String {
+    match value {
+        DataValue::Byte(v) => v.to_string(),
+        DataValue::Int16(v) => v.to_string(),
+        DataValue::UInt16(v) => v.to_string(),
+        DataValue::Int32(v) => v.to_string(),
+        DataValue::UInt32(v) => v.to_string(),
+        DataValue::Float32(v) => v.to_string(),
+        DataValue::Float64(v) => v.to_string(),
+        DataValue::String(v) => v.clone(),
+        DataValue::URL(v) => v.clone(),
     }
 }

@@ -419,7 +419,7 @@ mod tests {
 
         for (input, expected) in test_cases {
             let (_, parsed) = DataType::parse(input).unwrap();
-            assert_eq!(parsed, expected, "Failed to parse {}", input);
+            assert_eq!(parsed, expected, "Failed to parse {input}");
         }
     }
 
@@ -475,14 +475,15 @@ mod tests {
         assert_eq!(TryInto::<f64>::try_into(uint32_val).unwrap(), 4000000000.0);
 
         // Test Float64 conversions
-        let float64_val = DataValue::Float64(3.14159265359);
+        let float64_val = DataValue::Float64(std::f64::consts::PI);
         assert_eq!(TryInto::<i32>::try_into(float64_val.clone()).unwrap(), 3);
         assert!(
-            (TryInto::<f32>::try_into(float64_val.clone()).unwrap() - 3.1415927).abs() < 0.0001
+            (TryInto::<f32>::try_into(float64_val.clone()).unwrap() - std::f32::consts::PI).abs()
+                < 0.0001
         );
         assert_eq!(
             TryInto::<f64>::try_into(float64_val).unwrap(),
-            3.14159265359
+            std::f64::consts::PI
         );
 
         // Test String conversions

@@ -164,7 +164,7 @@ fn test_real_dataset_size_estimation() {
         .unwrap();
 
     // wind_dir is Int32 (4 bytes) with dimensions [time=461468][latitude=1][longitude=1]
-    let expected_size = 461468 * 1 * 1 * 4;
+    let expected_size = 461468 * 4;
     assert_eq!(query.estimated_size(), expected_size);
 
     // Test subset size estimation
@@ -179,7 +179,7 @@ fn test_real_dataset_size_estimation() {
         .select_by_coordinate("longitude", CoordinateConstraint::single(0))
         .unwrap();
 
-    let expected_subset_size = 100 * 1 * 1 * 4;
+    let expected_subset_size = 100 * 4;
     assert_eq!(query.estimated_size(), expected_subset_size);
 
     // Test strided size estimation
@@ -194,7 +194,7 @@ fn test_real_dataset_size_estimation() {
         .select_by_coordinate("longitude", CoordinateConstraint::single(0))
         .unwrap();
 
-    let expected_strided_size = 10 * 1 * 1 * 4; // 100 steps / 10 stride = 10 points
+    let expected_strided_size = 10 * 4; // 100 steps / 10 stride = 10 points
     assert_eq!(query.estimated_size(), expected_strided_size);
 }
 
