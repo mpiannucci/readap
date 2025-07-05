@@ -46,7 +46,7 @@ pub fn parse_dds(content: &str) -> Result<JsValue, JsValue> {
 
             Ok(obj.into())
         }
-        Err(e) => Err(JsValue::from_str(&format!("Parse error: {}", e))),
+        Err(e) => Err(JsValue::from_str(&format!("Parse error: {e}"))),
     }
 }
 
@@ -71,7 +71,7 @@ pub fn parse_das(content: &str) -> Result<JsValue, JsValue> {
 
             Ok(obj.into())
         }
-        Err(e) => Err(JsValue::from_str(&format!("Parse error: {}", e))),
+        Err(e) => Err(JsValue::from_str(&format!("Parse error: {e}"))),
     }
 }
 
@@ -98,7 +98,7 @@ pub fn parse_dods(bytes: &[u8]) -> Result<JsValue, JsValue> {
 
             Ok(obj.into())
         }
-        Err(e) => Err(JsValue::from_str(&format!("Parse error: {}", e))),
+        Err(e) => Err(JsValue::from_str(&format!("Parse error: {e}"))),
     }
 }
 
