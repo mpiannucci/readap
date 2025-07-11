@@ -6,3 +6,11 @@ readap is a rust library for reading OpenDAP DAP2 datasets. It does not aim to b
 
 Dap2 is a protocol for accessing scientific data. This project is a sparse implementation of the dap2 specification. 
 
+## Developing
+
+Use `cargo` to build and run the tests:
+
+```bash
+cargo build
+cargo test
+```
