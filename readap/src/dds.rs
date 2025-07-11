@@ -595,21 +595,9 @@ mod tests {
 
         assert_eq!(dataset.name, "data/swden/44097/44097w9999.nc");
         assert_eq!(dataset.values.len(), 3);
-        assert!(if let DdsValue::Array(_) = dataset.values[0] {
-            true
-        } else {
-            false
-        });
-        assert!(if let DdsValue::Array(_) = dataset.values[1] {
-            true
-        } else {
-            false
-        });
-        assert!(if let DdsValue::Grid(_) = dataset.values[2] {
-            true
-        } else {
-            false
-        });
+        assert!(matches!(dataset.values[0], DdsValue::Array(_)));
+        assert!(matches!(dataset.values[1], DdsValue::Array(_)));
+        assert!(matches!(dataset.values[2], DdsValue::Grid(_)));
     }
 
     #[test]
@@ -623,7 +611,7 @@ mod tests {
         assert_eq!(array.coords[0].0, "time");
         assert_eq!(array.coords[0].1, 10);
         assert_eq!(array.array_length(), 10);
-        assert_eq!(array.byte_count(), 8 + 10 * 1); // 8 bytes header + 10 bytes data
+        assert_eq!(array.byte_count(), 8 + 10); // 8 bytes header + 10 bytes data
 
         // Test Int16 array
         let input = "Int16 elevations[latitude = 5][longitude = 5];";
